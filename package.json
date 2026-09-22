@@ -1,0 +1,14 @@
+{
+  "name": "dhaka-tesla-pool", "version": "0.1.0", "private": true,
+  "workspaces": ["apps/api", "apps/web"],
+  "engines": { "node": ">=24.0.0 <25" },
+  "scripts": {
+    "dev:api": "npm run dev -w @dtp/api", "dev:web": "npm run dev -w @dtp/web",
+    "typecheck": "npm run typecheck --workspaces", "build": "npm run build --workspaces",
+    "test": "npm run test -w @dtp/api",
+    "db:generate": "npm run db:generate -w @dtp/api",
+    "db:migrate": "npm run db:migrate -w @dtp/api",
+    "db:seed": "npm run db:seed -w @dtp/api",
+    "test:db": "npm run test:db -w @dtp/api"
+  }
+}

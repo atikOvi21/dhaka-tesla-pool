@@ -1,0 +1,22 @@
+:global(*) { box-sizing: border-box; }
+:global(body) { margin: 0; background: #f5f3e9; color: #173d36; font-family: system-ui, sans-serif; }
+.page { max-width: 1040px; margin: auto; padding: 32px 32px 24px; }
+.header { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding-bottom: 28px; border-bottom: 1px solid #c9d0c3; }
+.brand { font-size: 12px; font-weight: 800; letter-spacing: .12em; }
+.tag { font-size: 12px; border: 1px solid #647c68; border-radius: 30px; padding: 7px 12px; white-space: nowrap; }
+.hero { padding: 60px 0 36px; max-width: 740px; }
+.eyebrow { font-size: 11px; letter-spacing: .15em; font-weight: 750; }
+.hero h1 { font-size: clamp(42px, 7vw, 74px); line-height: 1.05; letter-spacing: -.055em; margin: 20px 0 24px; font-weight: 650; }
+.intro { font-size: 18px; line-height: 1.7; max-width: 620px; color: #426052; }
+.card { background: #e6ecd9; border: 1px solid #b4c49f; border-radius: 14px; padding: 26px; }
+.card h2 { font-size: 23px; margin: 8px 0 20px; }
+.ready, .checking, .error { padding: 12px 0; font-weight: 600; }
+.error { color: #9c2822; }
+.card button { background: #173d36; color: white; border: 0; border-radius: 6px; padding: 12px 18px; font: inherit; cursor: pointer; }
+.card button:disabled { opacity: .6; cursor: wait; }
+.card button:focus-visible { outline: 3px solid #896116; outline-offset: 4px; }
+.scope { padding: 24px 0; max-width: 700px; line-height: 1.7; }
+.scope h2 { font-size: 17px; margin-bottom: 6px; }
+.scope p { color: #426052; margin-top: 0; }
+.footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; border-top: 1px solid #c9d0c3; padding-top: 22px; color: #426052; font-size: 12px; }
+@media (max-width: 520px) { .page { padding: 24px 20px; } .header { align-items: flex-start; } .brand { max-width: 150px; line-height: 1.6; } .hero { padding-top: 38px; } .card { padding: 20px; } }
