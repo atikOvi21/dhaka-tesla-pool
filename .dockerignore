@@ -1,0 +1,11 @@
+**/node_modules
+**/dist
+**/coverage
+**/.env
+**/.env.*
+!.env.example
+.git
+.tmp
+apps/api/src/generated
+*.pdf
+*.log

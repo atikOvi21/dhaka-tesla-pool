@@ -1,0 +1,63 @@
+name: dhaka-tesla-pool
+services:
+  db:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-dtp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dtp_demo_only}
+      POSTGRES_DB: ${POSTGRES_DB:-dhaka_tesla_pool}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+  init:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: init
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-dtp}:${POSTGRES_PASSWORD:-dtp_demo_only}@db:5432/${POSTGRES_DB:-dhaka_tesla_pool}
+      SEED_DEMO: ${SEED_DEMO:-true}
+    command: ["sh", "-c", "npm run db:migrate && if [ \"$$SEED_DEMO\" = true ]; then npm run db:seed; fi"]
+    depends_on:
+      db:
+        condition: service_healthy
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: runtime
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-dtp}:${POSTGRES_PASSWORD:-dtp_demo_only}@db:5432/${POSTGRES_DB:-dhaka_tesla_pool}
+      PORT: 3000
+      NODE_ENV: production
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/v1/health/ready',{signal:AbortSignal.timeout(4000)}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    ports:
+      - "127.0.0.1:${WEB_PORT:-8080}:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+    restart: unless-stopped
+volumes:
+  postgres_data:
