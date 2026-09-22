@@ -1,0 +1,204 @@
+generator client {
+  provider = "prisma-client"
+  output = "../src/generated/prisma"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  PASSENGER
+  DRIVER
+}
+enum BookingStatus {
+  REQUESTED
+  MATCHED
+  DRIVER_ARRIVED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+enum PoolStatus {
+  ACCEPTED
+  DRIVER_ARRIVED
+  STARTED
+  COMPLETED
+  CANCELLED
+}
+enum ReleaseReason {
+  CANCELLED
+  COMPLETED
+}
+enum EventType {
+  REQUEST_CREATED
+  REQUEST_MATCHED
+  REQUEST_CANCELLED
+  POOL_ACCEPTED
+  DRIVER_ARRIVED
+  POOL_STARTED
+  BOOKING_COMPLETED
+  POOL_COMPLETED
+  POOL_CANCELLED
+}
+
+model User {
+  id String @id @default(uuid()) @db.Uuid
+  email String @unique @db.VarChar(254)
+  name String @db.VarChar(100)
+  password_hash String
+  role Role @default(PASSENGER)
+  created_at DateTime @default(now()) @db.Timestamptz(3)
+  updated_at DateTime @updatedAt @db.Timestamptz(3)
+  driver_profile DriverProfile?
+  vehicle Vehicle?
+  ride_requests RideRequest[]
+  events RideEvent[]
+  @@unique([id, role])
+  @@map("users")
+}
+
+// connect-pg-simple's default layout, configured with tableName: sessions later.
+model Session {
+  sid String @id @db.VarChar
+  sess Json @db.Json
+  expire DateTime @db.Timestamp(6)
+  @@index([expire])
+  @@map("sessions")
+}
+
+model DriverProfile {
+  user_id String @id @db.Uuid
+  role Role @default(DRIVER)
+  online Boolean @default(false)
+  updated_at DateTime @updatedAt @db.Timestamptz(3)
+  user User @relation(fields: [user_id, role], references: [id, role], onDelete: Restrict, onUpdate: Restrict)
+  @@unique([user_id, role])
+  @@map("driver_profiles")
+}
+
+model Vehicle {
+  id String @id @default(uuid()) @db.Uuid
+  driver_id String @unique @db.Uuid
+  driver_role Role @default(DRIVER)
+  name String @db.VarChar(100)
+  capacity Int
+  created_at DateTime @default(now()) @db.Timestamptz(3)
+  driver User @relation(fields: [driver_id, driver_role], references: [id, role], onDelete: Restrict, onUpdate: Restrict)
+  pools Pool[]
+  @@unique([driver_id, driver_role])
+  @@map("vehicles")
+}
+
+model Zone {
+  id String @id @default(uuid()) @db.Uuid
+  name String @unique @db.VarChar(100)
+  pickup_routes Route[] @relation("pickup")
+  destination_routes Route[] @relation("destination")
+  pools Pool[]
+  @@map("zones")
+}
+
+model Route {
+  id String @id @default(uuid()) @db.Uuid
+  pickup_zone_id String @db.Uuid
+  destination_zone_id String @db.Uuid
+  compatibility_group String @db.VarChar(100)
+  demo_distance_meters Int
+  pickup_zone Zone @relation("pickup", fields: [pickup_zone_id], references: [id], onDelete: Restrict)
+  destination_zone Zone @relation("destination", fields: [destination_zone_id], references: [id], onDelete: Restrict)
+  ride_requests RideRequest[]
+  @@unique([pickup_zone_id, destination_zone_id])
+  @@index([destination_zone_id])
+  @@map("routes")
+}
+
+model RideRequest {
+  id String @id @default(uuid()) @db.Uuid
+  passenger_id String @db.Uuid
+  passenger_role Role @default(PASSENGER)
+  route_id String @db.Uuid
+  seats Int
+  status BookingStatus @default(REQUESTED)
+  idempotency_key String @db.VarChar(128)
+  payload_fingerprint String @db.VarChar(64)
+  pricing_version String @db.VarChar(50)
+  distance_meters Int
+  base_fare_poisha Int
+  rate_per_km_poisha Int
+  solo_maximum_poisha Int
+  provisional_pooled_poisha Int
+  discount_bps Int?
+  final_fare_poisha Int?
+  finalized_at DateTime? @db.Timestamptz(3)
+  created_at DateTime @default(now()) @db.Timestamptz(3)
+  updated_at DateTime @updatedAt @db.Timestamptz(3)
+  passenger User @relation(fields: [passenger_id, passenger_role], references: [id, role], onDelete: Restrict, onUpdate: Restrict)
+  route Route @relation(fields: [route_id], references: [id], onDelete: Restrict)
+  membership PoolMembership?
+  events RideEvent[]
+  @@unique([passenger_id, idempotency_key])
+  @@index([passenger_id, created_at, id])
+  @@index([status, created_at, id])
+  @@index([route_id, status])
+  @@map("ride_requests")
+}
+
+model Pool {
+  id String @id @default(uuid()) @db.Uuid
+  vehicle_id String @db.Uuid
+  capacity_snapshot Int
+  allocated_seats Int @default(0)
+  pickup_zone_id String @db.Uuid
+  route_group String @db.VarChar(100)
+  status PoolStatus @default(ACCEPTED)
+  created_at DateTime @default(now()) @db.Timestamptz(3)
+  updated_at DateTime @updatedAt @db.Timestamptz(3)
+  arrived_at DateTime? @db.Timestamptz(3)
+  started_at DateTime? @db.Timestamptz(3)
+  completed_at DateTime? @db.Timestamptz(3)
+  vehicle Vehicle @relation(fields: [vehicle_id], references: [id], onDelete: Restrict)
+  pickup_zone Zone @relation(fields: [pickup_zone_id], references: [id], onDelete: Restrict)
+  memberships PoolMembership[]
+  events RideEvent[]
+  @@index([pickup_zone_id, route_group, status, created_at])
+  @@index([vehicle_id, created_at, id])
+  @@map("pools")
+}
+
+model PoolMembership {
+  id String @id @default(uuid()) @db.Uuid
+  request_id String @unique @db.Uuid
+  pool_id String @db.Uuid
+  seats Int
+  joined_at DateTime @default(now()) @db.Timestamptz(3)
+  released_at DateTime? @db.Timestamptz(3)
+  release_reason ReleaseReason?
+  request RideRequest @relation(fields: [request_id], references: [id], onDelete: Restrict)
+  pool Pool @relation(fields: [pool_id], references: [id], onDelete: Restrict)
+  @@index([pool_id, released_at])
+  @@map("pool_memberships")
+}
+
+model RideEvent {
+  id String @id @default(uuid()) @db.Uuid
+  actor_id String? @db.Uuid
+  request_id String? @db.Uuid
+  pool_id String? @db.Uuid
+  event_type EventType
+  operation_key String @unique @db.VarChar(200)
+  from_booking_status BookingStatus?
+  to_booking_status BookingStatus?
+  from_pool_status PoolStatus?
+  to_pool_status PoolStatus?
+  metadata Json @default("{}")
+  created_at DateTime @default(now()) @db.Timestamptz(3)
+  actor User? @relation(fields: [actor_id], references: [id], onDelete: SetNull)
+  request RideRequest? @relation(fields: [request_id], references: [id], onDelete: Restrict)
+  pool Pool? @relation(fields: [pool_id], references: [id], onDelete: Restrict)
+  @@index([request_id, created_at, id])
+  @@index([pool_id, created_at, id])
+  @@index([actor_id])
+  @@map("ride_events")
+}
