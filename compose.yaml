@@ -35,6 +35,10 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-dtp}:${POSTGRES_PASSWORD:-dtp_demo_only}@db:5432/${POSTGRES_DB:-dhaka_tesla_pool}
       PORT: 3000
       NODE_ENV: production
+      SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET in .env to a random 32+ character secret}
+      AUTH_ORIGINS: ${AUTH_ORIGINS:-http://localhost:8080}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
+      TRUST_PROXY_HOPS: "1"
     depends_on:
       init:
         condition: service_completed_successfully
