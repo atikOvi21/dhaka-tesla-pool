@@ -27,3 +27,7 @@ The API runtime image prunes dev, peer and optional dependencies; all three omis
 Added express-session 1.19.0, connect-pg-simple 10.0.0 and express-rate-limit 8.7.0 (resolved in lockfile), plus community TypeScript definitions. Consulted the [session middleware API](https://expressjs.com/en/resources/middleware/session/), [PostgreSQL session-store options](https://github.com/voxpelli/node-connect-pg-simple), and [rate-limit configuration](https://express-rate-limit.mintlify.app/reference/configuration). Inspected the installed store source for Math.ceil expiry rounding, disableTouch and prune/close behavior.
 
 Install/build still report the same four high Prisma-tooling advisories, with no forced upgrades. Final auth runtime pruning audited 115 packages with zero vulnerabilities; the four advisory-related tooling packages remain excluded from the running API image. This does not claim the whole development dependency tree or container OS is vulnerability-free.
+
+## Frontend authentication checkpoint
+
+Added development-only Vitest/jsdom, React Testing Library/user-event/jest-dom and Playwright. Exact versions are in the lockfile. Browser tests use installed Microsoft Edge on Windows and the same Docker images with isolated tmpfs PostgreSQL. No additional frontend runtime dependency was needed. Docker full dependency installation still reported four high tooling advisories; API runtime pruning reported 142 packages and zero vulnerabilities. This is not an all-dependency or OS clean-audit claim.

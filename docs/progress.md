@@ -1,6 +1,47 @@
 # Progress
 
-## Current checkpoint — backend authentication verified
+## Current checkpoint - complete authentication verified
+
+Branch: **feature/auth**. Backend authentication was preserved; no backend integration change was needed. Frontend work uses React, straightforward TypeScript, React Router, CSS Modules and native fetch. No ride features, merge, push or deployment.
+
+### Completed
+
+Passenger registration signs in immediately; passenger/driver login routes by the returned role. Session restoration has distinct loading, anonymous and retryable failure states. Protected workspaces reject wrong roles. Logout ends the server session; expiry is detected on focus/visibility and a 60-second visible-page check. CSRF is fetched before mutations and refreshed after login/registration; no automatic mutation retries or localStorage credentials. Forms have labels, validation, keyboard focus, disabled submission, password clearing and retained name/email after errors. Foundation remains public at /foundation. Ride functionality is explicitly upcoming.
+
+### Checks actually run
+
+- 16 frontend Vitest/Testing Library tests passed.
+- 19 real-PostgreSQL auth tests and 5 shared API tests passed using the isolated browser-test database.
+- Two Playwright journeys passed using headless Microsoft Edge: desktop against real Nginx/API/PostgreSQL, plus mobile layout/keyboard validation.
+- Verified registration, seeded Nusrat and Jashim, wrong password, reload, direct protected navigation, wrong-role denial, logout/access afterward, test-session expiry, offline recovery and intercepted GET /auth/me 503 recovery.
+- Frontend typecheck and production build passed; full Docker build passed, including API build. Final frontend-only rebuild after formatting/title cleanup passed. Final frontend typecheck passed again.
+- Main Docker API/web/database are healthy. Direct GET /driver returned 200 through Nginx; /api/v1/health/ready returned ready.
+- Desktop login/passenger and mobile registration screenshots visually inspected; committed under docs/images.
+- git diff --check passed before the implementation commit.
+- Development records/volume were preserved. The disposable stack was stopped and removed after verification; the main :8080 stack remains running. Browser fixtures used a separate stack at :8081 with a tmpfs database; backend regression tests ran there too. No repeated foundation validation or public deployment.
+- Docker full install still reported four high tooling advisories; runtime prune reported zero vulnerabilities. No forced upgrades.
+
+Reproduction commands and manual review are in [authentication](authentication.md#frontend-authentication). Backend regression command used:
+```powershell
+docker compose -f compose.e2e.yaml run --rm --no-deps -e AUTH_TEST_DATABASE_URL=postgresql://dtp_test:dtp_test_only@db:5432/dhaka_tesla_auth_test init npm exec -w @dtp/api -- vitest run src/auth/auth.integration.test.ts src/app.test.ts
+```
+
+### Git and handoff
+
+- e620770 - feat(auth): add PostgreSQL sessions and verified backend authentication
+- f8edb91 - docs(auth): record backend verification and frontend handoff
+- f3d717e - feat(auth): complete frontend forms and protected session flows
+- Documentation commit: docs(auth): record full authentication verification and review steps (see git log for its hash).
+- Remain on feature/auth; master is unchanged. Frontend edits incorporate the existing frontend formatting.
+- Five pre-existing backend edits remain excluded from these commits: app.test.ts and auth/{auth.integration.test.ts,config.ts,index.ts,service.ts}. Do not discard them or silently include them in frontend work.
+
+Authentication is functionally ready for merge review. No verification blocker remains. Review/preserve the outstanding backend formatting changes before integration. Existing limitations: process-local rate limits, no password recovery/email verification, tooling advisories, no public HTTPS deployment. AI acceptance/rejection disclosure still needs actual candidate input.
+
+Next task, only when requested: implement the complete single-passenger ride lifecycle, beginning with agreed API/state transitions and ownership rules, then transactional backend behavior, UI and focused lifecycle tests. Do not begin pooling, fare or ride implementation during this authentication checkpoint.
+
+---
+
+## Historical backend checkpoint — backend authentication verified
 
 Branch: **feature/auth**. Foundation master was fast-forwarded to 80f9995 after inspecting its recorded verification and PRD-compliant commit subjects. No history rewrite, push, release branch, or authentication merge into master.
 
@@ -51,7 +92,7 @@ Main runtime: http://localhost:8080; host Vite remains http://localhost:5173 whe
 
 No backend checkpoint blocker remains. Limitations: in-memory rate limits reset on restart and are not shared across API instances; no password recovery/email verification; four existing tooling advisories; no public HTTPS deployment or browser authentication testing. No frontend auth screens exist yet, so the foundation page still labels UI authentication as coming next. Accepted/rejected AI examples still await genuine candidate input.
 
-**Exact next frontend checkpoint:** continue on feature/auth, preserving existing formatting edits. Extend fetch with JSON/status-aware errors/CSRF; add auth context with loading, signed-out, signed-in and failure states; restore /auth/me without treating 500/network failures as logout; implement accessible passenger registration and both-role login; refresh CSRF after authentication; add logout and role-protected passenger/driver placeholder landings while retaining connectivity. Then verify refresh, both roles, denied navigation, expiry/token recovery and logout in the browser. Backend middleware stays authoritative. No booking/pooling/fare work and no merge into master yet. See [detailed handoff](authentication.md#exact-next-frontend-task).
+**Exact next frontend checkpoint:** continue on feature/auth, preserving existing formatting edits. Extend fetch with JSON/status-aware errors/CSRF; add auth context with loading, signed-out, signed-in and failure states; restore /auth/me without treating 500/network failures as logout; implement accessible passenger registration and both-role login; refresh CSRF after authentication; add logout and role-protected passenger/driver placeholder landings while retaining connectivity. Then verify refresh, both roles, denied navigation, expiry/token recovery and logout in the browser. Backend middleware stays authoritative. No booking/pooling/fare work and no merge into master yet. See [detailed handoff](authentication.md#frontend-authentication).
 
 ---
 

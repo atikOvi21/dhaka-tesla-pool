@@ -1,6 +1,6 @@
-# Backend authentication checkpoint
+# Authentication
 
-Implemented routes: GET /api/v1/auth/csrf, POST /auth/register, POST /auth/login, POST /auth/logout, GET /auth/me (all under /api/v1). No frontend authentication screens or business endpoints are implemented in this checkpoint.
+Implemented routes: GET /api/v1/auth/csrf, POST /auth/register, POST /auth/login, POST /auth/logout, GET /auth/me (all under /api/v1). Frontend authentication is implemented and verified. Business endpoints remain planned.
 
 ## Contract and security decisions
 
@@ -48,13 +48,42 @@ The smoke script logs in seeded Nusrat and Jashim through Nginx, checks cookie/C
 
 Manual API sequence: GET /api/v1/auth/csrf while retaining cookies; POST /auth/login with Origin, X-CSRF-Token and demo email/password; GET /auth/me with the new cookie; GET /auth/csrf again; POST /auth/logout using that new token. Replace login with register and a new name/email/password to create a passenger. All state remains server-side.
 
-## Exact next frontend task
+## Frontend authentication
 
-1. Extend the shared fetch wrapper to send JSON and CSRF headers with same-origin credentials and preserve status/error codes; never store auth tokens in localStorage.
-2. Add auth context with distinct loading, authenticated, unauthenticated (401), and failure states. Restore through /auth/me; do not turn 500/network failure into logout.
-3. Add accessible login and passenger registration forms, field errors, loading/duplicate-submission protection. Fetch CSRF before mutations and refresh it after successful login/registration.
-4. Add logout and role-specific guarded passenger/driver landing pages clearly marking rides as unimplemented; backend remains authoritative. Keep foundation connectivity accessible.
-5. Verify browser refresh, both seed roles, passenger denial of driver navigation, CSRF refresh/expiry recovery, and logout. Preserve the user's existing formatting edits.
-6. Update progress and commit this second checkpoint on feature/auth. Do not merge auth into master until the user reviews the full milestone.
+Routes: /login, /register, /passenger, /driver, and public /foundation. Root opens login or the current role's workspace. Nginx and Vite serve SPA deep links directly.
 
-No password reset/email verification, per-device session management, or business flows are included. The candidate's pending AI accepted/rejected examples remain pending.
+AuthContext restores GET /auth/me before routing; loading never flashes the login page. Only 401 becomes anonymous. Network/5xx failures show Retry and retain non-sensitive form drafts. Active sessions are rechecked every 60 seconds while visible and on window focus/visibility changes. Expiry or another-tab logout displays a sign-in message. This interval applies to authentication only, not the planned business polling.
+
+The fetch wrapper sends same-origin cookies and obtains a fresh CSRF token before every mutation. It also refreshes after successful login/registration. Logout discards authenticated state; the next mutation bootstraps a new anonymous token. No credentials are kept in localStorage. Mutations are never automatically replayed, including when post-login token refresh fails; Retry checks the session instead. Password inputs are cleared after attempted requests, while name/email survive recoverable failures. Form fields and submit buttons are disabled during submission.
+
+Role guards prevent the opposite workspace from rendering and link to the correct workspace. These are UI controls; server authorization remains authoritative. Landing pages explicitly mark all ride features as upcoming.
+
+### Reproduce browser verification
+
+From the repository root, with npm dependencies installed and .env configured:
+
+```powershell
+npm test -w @dtp/web
+npm run typecheck -w @dtp/web
+npm run build -w @dtp/web
+docker compose build
+docker compose -f compose.e2e.yaml up --no-build -d --wait
+npm run test:e2e -w @dtp/web
+docker compose -f compose.e2e.yaml down
+```
+
+The separate Compose project runs the same application images at localhost:8081, with a tmpfs PostgreSQL database and no development volume. It seeds independent accounts, uses a unique registration email, and expires only that test user's session to verify recovery. Do not point these tests at development/production. Tests use installed Microsoft Edge on Windows; elsewhere install Playwright Chromium with npx playwright install chromium, or set BROWSER_CHANNEL to an installed compatible browser. Traces are disabled to avoid saving credentials/cookies.
+
+Two browser tests cover the full desktop journey and a mobile registration/keyboard/layout check. The desktop journey exercises registration, Nusrat/Jashim login, wrong password, refresh, direct protected links, wrong roles, logout, session expiry, offline/503 recovery, empty browser storage and foundation readiness. Backend regression tests also ran against this isolated database (19 auth + 5 HTTP).
+
+### Manual review
+
+1. Start the main stack with docker compose up --build -d. Open http://localhost:8080/register and register a new passenger (name, unused email, 12-128-character password). Confirm /passenger opens, then refresh.
+2. Sign out. At http://localhost:8080/login try a wrong password, then nusrat@demo.dhaka.test with DemoOnly!Dhaka2026. Visit /driver and confirm access is denied with a link back.
+3. Sign out and log in as jashim@demo.dhaka.test with the same demo password. Confirm /driver, refresh, and try /passenger.
+4. Sign out and open /driver or /passenger directly: login should appear after the session check.
+5. In browser developer tools set Network to Offline, then refocus the page while signed in (or refresh). Confirm a retryable error. Restore networking and press Retry. A simulated GET /auth/me 503 is covered by automated tests.
+6. Review registration and login at narrow mobile widths and use Tab/Enter. Check labels, focus indicators, validation and disabled submission.
+7. Open http://localhost:8080/foundation for connectivity. Production deep links are served by Nginx, not just Vite.
+
+No password reset/email verification, per-device session management, or business flows are included. No public HTTPS deployment was tested. Review the full authentication milestone before merging feature/auth into master. The next milestone is the complete single-passenger ride lifecycle; it has not started.

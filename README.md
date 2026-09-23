@@ -4,15 +4,17 @@ Share a seat. Split the fare. Survive Dhaka traffic.
 
 A small ride-pooling MVP for RoBenDevs’ Software Engineer Internship assessment. Jashim drives Bullet, a three-seat vehicle; Nusrat, Rafiq, and Shirin request compatible trips. The eventual product must keep each passenger's fare private and never oversell Bullet.
 
-**Status: foundation and backend authentication implemented.** Frontend authentication is the next checkpoint. Submission deadline supplied by the candidate: **27 September 2026, 23:59 Bangladesh time**. Requirements source: [supplied PRD](Dhaka_Tesla_Pool_PRD_Internship.pdf), all five pages read.
+**Status: foundation and complete frontend/backend authentication implemented and verified.** The next milestone is the single-passenger ride lifecycle. Submission deadline supplied by the candidate: **27 September 2026, 23:59 Bangladesh time**. Requirements source: [supplied PRD](Dhaka_Tesla_Pool_PRD_Internship.pdf), all five pages read.
 
 ## Implemented versus planned
 
 Implemented: PostgreSQL-backed authentication (passenger registration, seeded passenger/driver login, logout/me, CSRF, role middleware, expiry and rate limiting), plus React/Router/Vite TypeScript scaffold, Express health API, PostgreSQL/Prisma ten-table schema and SQL constraints, insert-only demo seed with scrypt password hashes, same-origin proxy, Docker setup and health checks, API health tests and real-database foundation checks.
 
-Planned: frontend login/registration, auth context and protected landing pages; request creation/idempotency, matching/capacity services, lifecycle/cancellation, fare calculations, history dashboards, polling, and the PRD's business/concurrency tests. The schema prepares for these; it does not mean they work.
+Implemented UI: passenger registration, both-role login, session restoration, role-protected landing pages, logout, retryable failures and accessible responsive forms.
 
-Public deployment URL: **pending**. Demo video (maximum six minutes): **pending**. Product-flow screenshots/GIFs: **pending functional screens**. Foundation screenshots: [desktop](docs/images/foundation-desktop.png) / [mobile](docs/images/foundation-mobile.png).
+Planned: request creation/idempotency, matching/capacity services, lifecycle/cancellation, fare calculations, history dashboards, polling, and the PRD's business/concurrency tests. The schema prepares for these; it does not mean they work.
+
+Public deployment URL: **pending**. Demo video (maximum six minutes): **pending**. Authentication screenshots: [login](docs/images/auth-login-desktop.png), [passenger](docs/images/auth-passenger-desktop.png), [mobile registration](docs/images/auth-register-mobile.png). Foundation screenshots: [desktop](docs/images/foundation-desktop.png) / [mobile](docs/images/foundation-mobile.png).
 
 ## Quick start — Docker
 
@@ -24,7 +26,7 @@ docker compose up --build -d
 docker compose ps -a
 ```
 
-The environment helper works on Windows/macOS/Linux and preserves existing settings and secrets. Open **http://localhost:8080**. The page should show “Browser → API → PostgreSQL connected”. Initial image downloads can take several minutes. Subsequent `docker compose up` uses the built images. Database health gates the one-shot migration/seed service, which must exit successfully before API startup; API readiness gates the frontend.
+The environment helper works on Windows/macOS/Linux and preserves existing settings and secrets. Open **http://localhost:8080**. The root opens login or your role-specific workspace. Visit **http://localhost:8080/foundation** for connectivity status. Initial image downloads can take several minutes. Subsequent `docker compose up` uses the built images. Database health gates the one-shot migration/seed service, which must exit successfully before API startup; API readiness gates the frontend.
 
 ```powershell
 docker compose logs init api
@@ -83,7 +85,7 @@ See [progress and actual verification results](docs/progress.md). API contract t
 | Rafiq | rafiq@demo.dhaka.test | Passenger |
 | Shirin | shirin@demo.dhaka.test | Passenger |
 
-All initial demo passwords: `DemoOnly!Dhaka2026`. **Demo only; login works through the API. Frontend forms are not implemented yet.** Database stores salted scrypt hashes, never plaintext. Existing passwords are not reset by seeding. Banani–Mohakhali (3 km) and Banani–Gulshan 1 (4 km) share a compatibility group; Dhanmondi–Mirpur supplies a noncompatible example. All are simplified demo data, not road routing.
+All initial demo passwords: `DemoOnly!Dhaka2026`. **Demo only; use /login for either role.** Database stores salted scrypt hashes, never plaintext. Existing passwords are not reset by seeding. Banani–Mohakhali (3 km) and Banani–Gulshan 1 (4 km) share a compatibility group; Dhanmondi–Mirpur supplies a noncompatible example. All are simplified demo data, not road routing.
 
 | Variable | Purpose |
 |---|---|
@@ -96,7 +98,7 @@ All initial demo passwords: `DemoOnly!Dhaka2026`. **Demo only; login works throu
 
 Run `node scripts/setup-local-env.mjs` once before startup. It creates .env if missing, generates a random SESSION_SECRET only when missing/placeholder, and preserves existing configuration. The secret must remain stable across restarts. SESSION_COOKIE_SECURE=false is only for loopback HTTP; HTTPS deployment uses true. AUTH_ORIGINS lists exact allowed browser origins (update it when changing WEB_PORT). Host TRUST_PROXY_HOPS=0; Compose uses one private Nginx hop. AUTH_TEST_DATABASE_URL targets only the isolated test database.
 
-Backend authentication setup, limits, API usage and exact frontend next steps: [authentication guide](docs/authentication.md).
+Authentication setup, limits, API usage, browser verification and manual review steps: [authentication guide](docs/authentication.md).
 
 Focused backend verification (no browser automation):
 
@@ -148,16 +150,16 @@ Controllers handle HTTP; later services enforce prices, ownership, state and sea
 | CSS Modules | Scoped styles without a design-system dependency; utility CSS/component library if repeated UI patterns outgrow this small app. |
 | React state/auth context + fetch | Small UI needs no global cache library; TanStack Query if cache invalidation/loading complexity grows. |
 | 5-second polling (planned) | Easy failure/reconnect behavior; SSE/WebSockets if measured freshness or polling load demands it. |
-| Vitest + Supertest + real PostgreSQL | Fast HTTP tests plus actual DB semantics; browser automation later for critical complete user journeys. |
+| Vitest + Supertest + real PostgreSQL | Fast HTTP tests plus actual DB semantics; Playwright verifies complete authentication journeys against real PostgreSQL. |
 | Docker Compose | Reproducible assessment deployment; managed hosting later for operations. Only free/free-tier providers; provider decision pending. |
 
 [Dependency notes and version-specific references](docs/dependencies.md) record observed advisories and documentation consulted.
 
 ## Workflow and limitations
 
-`feature/* → master → pre-release → release/v1.0.0`. The verified foundation was fast-forwarded into master; backend authentication stays on `feature/auth` for review. Existing user frontend formatting edits remain uncommitted. No push/deployment, history reset, fabricated commits, or early release branches. Later branches are cut at integration/release stages.
+`feature/* → master → pre-release → release/v1.0.0`. The verified foundation was fast-forwarded into master; complete authentication stays on `feature/auth` for review. Five pre-existing backend formatting edits remain uncommitted and were excluded from frontend commits. No push/deployment, history reset, fabricated commits, or early release branches. Later branches are cut at integration/release stages.
 
-Driver cancellation/reassignment is out of MVP. No real routing, GPS, payments, chat, Redis, queues, or microservices. No public deployment has been attempted. Frontend authentication and all booking behavior are still absent; do not expose this demo as a working ride service. Seed upserts are individually idempotent; if a seed is interrupted, rerun to finish missing records.
+Driver cancellation/reassignment is out of MVP. No real routing, GPS, payments, chat, Redis, queues, or microservices. No public deployment has been attempted. All booking behavior remains absent; do not expose this demo as a working ride service. Seed upserts are individually idempotent; if a seed is interrupted, rerun to finish missing records.
 
 ## AI usage — observed record
 
@@ -171,3 +173,11 @@ The candidate must review and be able to explain every shipped part. Before fina
 
 
 Backend checkpoint AI record: Codex implemented the user-requested auth API, session/CSRF protection, isolated PostgreSQL tests and runtime restart check. The candidate explicitly narrowed this checkpoint to backend work and deferred frontend/browser testing. A test assertion was corrected after inspecting connect-pg-simple's whole-second expiry rounding; exact application expiry remains independently checked. This is an observed engineering correction, not a fabricated accepted/rejected suggestion.
+
+## Frontend authentication verification
+
+See [the authentication guide](docs/authentication.md#frontend-authentication) for isolated browser tests and manual steps. Run `npm test -w @dtp/web` for the 16 focused UI tests; root `npm test` currently runs API tests only.
+
+The implementation keeps TypeScript at the boundaries: `src/api.ts` handles requests/errors, `src/auth/AuthContext.tsx` manages session state, `src/auth/AuthPages.tsx` contains forms and role guards, and `src/App.tsx` defines routes. The function bodies use familiar JavaScript/React patterns. Generated Prisma files are not tutorial entry points and should not be edited.
+
+Frontend AI record: Codex implemented the requested forms/session integration and tests, verified real backend browser journeys and desktop/mobile layouts, and preserved pre-existing backend edits. No candidate acceptance/rejection examples were invented.
