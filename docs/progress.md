@@ -1,5 +1,62 @@
 # Progress
 
+## Current checkpoint — backend authentication verified
+
+Branch: **feature/auth**. Foundation master was fast-forwarded to 80f9995 after inspecting its recorded verification and PRD-compliant commit subjects. No history rewrite, push, release branch, or authentication merge into master.
+
+At checkpoint start, three pre-existing frontend formatting edits were present: apps/web/index.html, apps/web/src/api.ts, apps/web/src/main.tsx. They were temporarily stashed only for the branch transition, restored, and excluded from backend commits. No frontend authentication or business features were implemented.
+
+### Completed behavior
+
+All five auth endpoints: anonymous CSRF bootstrap, passenger-only registration, passenger/driver login (seed-compatible scrypt), safe /me, logout. Strict validated/normalized email and names, unmodified passwords, duplicate-email constraint handling including races. PostgreSQL-backed sessions with regeneration, explicit save-before-success, fixed eight-hour authenticated / one-hour anonymous expiry, cleanup, matching cookie clearing, exact CSRF/origin checks, reusable auth/role middleware reading authoritative user roles, IP rate limits and bounded password hashing concurrency.
+
+Local HTTP works with explicitly insecure loopback-only cookies; public deployment requires HTTPS/Secure. Nginx forwards a single trusted hop and overwrites client forwarding headers. Existing sessions schema needed no migration. Full details: [authentication](authentication.md).
+
+### Checks actually run for this checkpoint
+
+- Backend TypeScript check passed after integration tests were added.
+- Full auth integration suite: **19 passed**, using isolated PostgreSQL dhaka_tesla_auth_test on :5434.
+- Initial auth run: 16/17 passed; one assertion incorrectly assumed store expiry had millisecond precision. Installed connect-pg-simple source confirms Math.ceil to whole seconds. Corrected tolerance to <1 second for storage and independently asserted the exact application deadline; all 19 tests then passed.
+- Covered registration/hash/password preservation, input/role injection, concurrent duplicate emails, seeded passenger/driver login and authorization, generic invalid credentials, me, session fixation/rotation, CSRF missing/invalid/foreign origin/cross-session/stale token, logout invalidation, persistence after app/store reconstruction, DB/application expiry, pruning, cookie tampering, both rate limiters, secure proxy cookies/config validation, malformed requests, database role changes, and fail-closed session-store errors without private details.
+- Five shared health/error API tests passed because the shared app/error boundary changed.
+- Backend production build passed locally and in Docker.
+- One full Compose rebuild for changed dependency/runtime/proxy configuration passed; init exited successfully, API/web/database became healthy. The existing frontend was built as part of Compose, but no frontend feature work/browser automation was performed.
+- node scripts/auth-runtime-smoke.mjs passed: live Nginx-to-API passenger/driver login, CSRF, cookie flags, rotation, actual API container restart retaining the original session, and logout rejecting replayed cookies.
+- Runtime dependency prune: 115 packages audited, zero vulnerabilities; prisma/@prisma/config/deepmerge-ts/mysql2 confirmed absent from API image. Four existing high development/init-tooling advisories remain; no force upgrade.
+- git diff --check passed. Local setup helper ran without replacing the existing session secret.
+- No repeated foundation database/concurrency/browser test cycle. Auth fixtures stayed in the isolated test database; runtime smoke used only the seeded accounts and temporary sessions.
+
+### Git checkpoint
+
+- e620770 — feat(auth): add PostgreSQL sessions and verified backend authentication
+- Documentation checkpoint commit: docs(auth): record backend verification and frontend handoff (see git log for its hash).
+- Auth remains on feature/auth. master remains at verified foundation 80f9995.
+- Only the three user frontend formatting edits are intended to remain uncommitted.
+
+### Reproduce / next steps
+
+```powershell
+node scripts/setup-local-env.mjs
+docker compose -f compose.auth-test.yaml up -d --wait db
+npm run typecheck -w @dtp/api
+npm run test:auth -w @dtp/api
+npm test -w @dtp/api
+npm run build -w @dtp/api
+docker compose up --build -d
+node scripts/auth-runtime-smoke.mjs
+docker compose -f compose.auth-test.yaml down
+```
+
+Main runtime: http://localhost:8080; host Vite remains http://localhost:5173 when started separately. The main Compose stack is left running for review. The disposable auth-test database is stopped/removed after verification; development database/storage are preserved. For a fresh checkout, run npm ci and npm run db:generate before host tests.
+
+No backend checkpoint blocker remains. Limitations: in-memory rate limits reset on restart and are not shared across API instances; no password recovery/email verification; four existing tooling advisories; no public HTTPS deployment or browser authentication testing. No frontend auth screens exist yet, so the foundation page still labels UI authentication as coming next. Accepted/rejected AI examples still await genuine candidate input.
+
+**Exact next frontend checkpoint:** continue on feature/auth, preserving existing formatting edits. Extend fetch with JSON/status-aware errors/CSRF; add auth context with loading, signed-out, signed-in and failure states; restore /auth/me without treating 500/network failures as logout; implement accessible passenger registration and both-role login; refresh CSRF after authentication; add logout and role-protected passenger/driver placeholder landings while retaining connectivity. Then verify refresh, both roles, denied navigation, expiry/token recovery and logout in the browser. Backend middleware stays authoritative. No booking/pooling/fare work and no merge into master yet. See [detailed handoff](authentication.md#exact-next-frontend-task).
+
+---
+
+# Foundation checkpoint — historical record
+
 ## Milestone 1 — foundation complete
 
 Verified on 23 September 2026 (Bangladesh time). PRD read completely (5 pages). Workspace initially contained only the supplied PDF; no prior repository/instructions. Host Node 24.19.0, npm 11.17.0; Docker Engine 28.4.0, Compose 2.39.4. Docker Desktop was started for verification. Python unavailable; temporary ignored pdf-parse extracted all pages.

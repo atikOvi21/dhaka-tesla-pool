@@ -10,5 +10,5 @@
 - Use npm workspaces and commit package-lock.json. Check relevant version-specific docs; avoid unnecessary dependencies.
 - Run typecheck, tests, build, and relevant real-PostgreSQL checks. Record only checks actually executed.
 - Work on feature/* with logical type(scope): description commits; merge to master only after review. Later integrate pre-release and release/v1.0.0. No automatic publishing/deployment.
-- Current scope is foundation only. Next milestone is authentication. Do not implement pooling or other business flows prematurely.
+- Current scope is backend authentication; see [authentication](docs/authentication.md). Next checkpoint is frontend authentication. Do not implement pooling or other business flows prematurely.
 - Update docs and truthful AI disclosure alongside changes; never invent candidate acceptance/rejection decisions.

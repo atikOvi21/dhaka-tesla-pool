@@ -4,27 +4,27 @@ Share a seat. Split the fare. Survive Dhaka traffic.
 
 A small ride-pooling MVP for RoBenDevs’ Software Engineer Internship assessment. Jashim drives Bullet, a three-seat vehicle; Nusrat, Rafiq, and Shirin request compatible trips. The eventual product must keep each passenger's fare private and never oversell Bullet.
 
-**Status: foundation only.** Authentication is the next milestone. Submission deadline supplied by the candidate: **27 September 2026, 23:59 Bangladesh time**. Requirements source: [supplied PRD](Dhaka_Tesla_Pool_PRD_Internship.pdf), all five pages read.
+**Status: foundation and backend authentication implemented.** Frontend authentication is the next checkpoint. Submission deadline supplied by the candidate: **27 September 2026, 23:59 Bangladesh time**. Requirements source: [supplied PRD](Dhaka_Tesla_Pool_PRD_Internship.pdf), all five pages read.
 
 ## Implemented versus planned
 
-Implemented: React/Router/Vite TypeScript scaffold, Express health API, PostgreSQL/Prisma ten-table schema and SQL constraints, insert-only demo seed with scrypt password hashes, same-origin proxy, Docker setup and health checks, API health tests and real-database foundation checks.
+Implemented: PostgreSQL-backed authentication (passenger registration, seeded passenger/driver login, logout/me, CSRF, role middleware, expiry and rate limiting), plus React/Router/Vite TypeScript scaffold, Express health API, PostgreSQL/Prisma ten-table schema and SQL constraints, insert-only demo seed with scrypt password hashes, same-origin proxy, Docker setup and health checks, API health tests and real-database foundation checks.
 
-Planned: registration/login/session/CSRF flows, request creation/idempotency, matching/capacity services, lifecycle/cancellation, fare calculations, history dashboards, polling, and the PRD's business/concurrency tests. The schema prepares for these; it does not mean they work.
+Planned: frontend login/registration, auth context and protected landing pages; request creation/idempotency, matching/capacity services, lifecycle/cancellation, fare calculations, history dashboards, polling, and the PRD's business/concurrency tests. The schema prepares for these; it does not mean they work.
 
 Public deployment URL: **pending**. Demo video (maximum six minutes): **pending**. Product-flow screenshots/GIFs: **pending functional screens**. Foundation screenshots: [desktop](docs/images/foundation-desktop.png) / [mobile](docs/images/foundation-mobile.png).
 
 ## Quick start — Docker
 
-Prerequisite: Docker Desktop running Linux containers (or Docker Engine), Compose v2, free ports 8080. No local Node/PostgreSQL installation needed for Docker.
+Prerequisite: Docker Desktop running Linux containers (or Docker Engine), Compose v2, free ports 8080. Node 24 is used by the optional local environment helper; otherwise copy .env.example and replace SESSION_SECRET with a securely generated random secret. No host PostgreSQL installation is needed.
 
 ```powershell
-Copy-Item .env.example .env
+node scripts/setup-local-env.mjs
 docker compose up --build -d
 docker compose ps -a
 ```
 
-On macOS/Linux use `cp .env.example .env`. Open **http://localhost:8080**. The page should show “Browser → API → PostgreSQL connected”. Initial image downloads can take several minutes. Subsequent `docker compose up` uses the built images. Database health gates the one-shot migration/seed service, which must exit successfully before API startup; API readiness gates the frontend.
+The environment helper works on Windows/macOS/Linux and preserves existing settings and secrets. Open **http://localhost:8080**. The page should show “Browser → API → PostgreSQL connected”. Initial image downloads can take several minutes. Subsequent `docker compose up` uses the built images. Database health gates the one-shot migration/seed service, which must exit successfully before API startup; API readiness gates the frontend.
 
 ```powershell
 docker compose logs init api
@@ -46,7 +46,7 @@ docker compose run --rm init
 Node **24.x**, npm (verified with 11.17.0), Docker Compose for PostgreSQL. Commands run from repository root; on PowerShell use `npm.cmd` if script execution policy blocks `npm`.
 
 ```powershell
-Copy-Item .env.example .env
+node scripts/setup-local-env.mjs
 npm ci
 npm run db:generate
 docker compose -f compose.yaml -f compose.dev.yaml up -d db
@@ -83,7 +83,7 @@ See [progress and actual verification results](docs/progress.md). API contract t
 | Rafiq | rafiq@demo.dhaka.test | Passenger |
 | Shirin | shirin@demo.dhaka.test | Passenger |
 
-All initial demo passwords: `DemoOnly!Dhaka2026`. **Demo only; login is not implemented yet.** Database stores salted scrypt hashes, never plaintext. Existing passwords are not reset by seeding. Banani–Mohakhali (3 km) and Banani–Gulshan 1 (4 km) share a compatibility group; Dhanmondi–Mirpur supplies a noncompatible example. All are simplified demo data, not road routing.
+All initial demo passwords: `DemoOnly!Dhaka2026`. **Demo only; login works through the API. Frontend forms are not implemented yet.** Database stores salted scrypt hashes, never plaintext. Existing passwords are not reset by seeding. Banani–Mohakhali (3 km) and Banani–Gulshan 1 (4 km) share a compatibility group; Dhanmondi–Mirpur supplies a noncompatible example. All are simplified demo data, not road routing.
 
 | Variable | Purpose |
 |---|---|
@@ -94,7 +94,23 @@ All initial demo passwords: `DemoOnly!Dhaka2026`. **Demo only; login is not impl
 | NODE_ENV | development locally; production in API container |
 | SEED_DEMO | Explicit permission to insert demo users; true locally, disable for real environments |
 
-No session secret is used yet. Authentication will add a required secret and document cookie settings; no fake security configuration is provided now.
+Run `node scripts/setup-local-env.mjs` once before startup. It creates .env if missing, generates a random SESSION_SECRET only when missing/placeholder, and preserves existing configuration. The secret must remain stable across restarts. SESSION_COOKIE_SECURE=false is only for loopback HTTP; HTTPS deployment uses true. AUTH_ORIGINS lists exact allowed browser origins (update it when changing WEB_PORT). Host TRUST_PROXY_HOPS=0; Compose uses one private Nginx hop. AUTH_TEST_DATABASE_URL targets only the isolated test database.
+
+Backend authentication setup, limits, API usage and exact frontend next steps: [authentication guide](docs/authentication.md).
+
+Focused backend verification (no browser automation):
+
+```powershell
+docker compose -f compose.auth-test.yaml up -d --wait db
+npm run typecheck -w @dtp/api
+npm run test:auth -w @dtp/api
+npm test -w @dtp/api
+npm run build -w @dtp/api
+node scripts/auth-runtime-smoke.mjs
+docker compose -f compose.auth-test.yaml down
+```
+
+The runtime smoke command requires the main Compose stack running and briefly restarts its API to prove PostgreSQL session persistence. Auth integration tests use disposable PostgreSQL on :5434 and never reset the development database. Authenticated sessions last 8 fixed hours; pre-login CSRF sessions last 1 hour. Login/register share 10 attempts per IP per 15 minutes; token bootstrap allows 60. These process-local limits reset on restart.
 
 ## Architecture and ownership
 
@@ -126,7 +142,7 @@ Controllers handle HTTP; later services enforce prices, ownership, state and sea
 | REST | Resource/lifecycle actions are easy to inspect and test; GraphQL if clients genuinely require varied nested projections. |
 | PostgreSQL | Transactions, row locks, partial unique indexes suit contested seats; MySQL is viable with different active-uniqueness design; SQLite for single-user prototypes only. |
 | Prisma 7 + SQL migrations | Typed queries and reviewable migrations; SQL retained for PostgreSQL constraints. Drizzle/raw SQL if ORM friction dominates complex matching queries. |
-| PostgreSQL sessions (planned) | Revocable sessions across instances without another datastore; JWTs if external clients need delegated stateless tokens, with a revocation strategy. |
+| PostgreSQL sessions | Revocable sessions across instances without another datastore; JWTs if external clients need delegated stateless tokens, with a revocation strategy. |
 | Scrypt | Node's built-in memory-hard hashing avoids native addon deployment work; Argon2id if operational support warrants a dedicated hashing package. |
 | Zod | Shared TypeScript-friendly input validation; JSON Schema/Ajv if schema interoperability becomes more important. |
 | CSS Modules | Scoped styles without a design-system dependency; utility CSS/component library if repeated UI patterns outgrow this small app. |
@@ -139,9 +155,9 @@ Controllers handle HTTP; later services enforce prices, ownership, state and sea
 
 ## Workflow and limitations
 
-`feature/* → master → pre-release → release/v1.0.0`. Bootstrap is on master; this foundation stays on `feature/project-foundation` for review. No push/deployment, history reset, fabricated commits, or early release branches. Later branches are cut at integration/release stages.
+`feature/* → master → pre-release → release/v1.0.0`. The verified foundation was fast-forwarded into master; backend authentication stays on `feature/auth` for review. Existing user frontend formatting edits remain uncommitted. No push/deployment, history reset, fabricated commits, or early release branches. Later branches are cut at integration/release stages.
 
-Driver cancellation/reassignment is out of MVP. No real routing, GPS, payments, chat, Redis, queues, or microservices. No public deployment has been attempted. Authentication and all booking behavior are still absent; do not expose this demo as a working ride service. Seed upserts are individually idempotent; if a seed is interrupted, rerun to finish missing records.
+Driver cancellation/reassignment is out of MVP. No real routing, GPS, payments, chat, Redis, queues, or microservices. No public deployment has been attempted. Frontend authentication and all booking behavior are still absent; do not expose this demo as a working ride service. Seed upserts are individually idempotent; if a seed is interrupted, rerun to finish missing records.
 
 ## AI usage — observed record
 
@@ -152,3 +168,6 @@ OpenAI Codex read the supplied PRD, inspected the environment, authored this fou
 - Observed implementation correction: Prisma validation required composite uniqueness for role-bearing one-to-one relations; Codex added it and reran checks. This is a technical correction, not an invented candidate rejection.
 
 The candidate must review and be able to explain every shipped part. Before final submission, replace the pending disclosure examples with real decisions from the collaboration.
+
+
+Backend checkpoint AI record: Codex implemented the user-requested auth API, session/CSRF protection, isolated PostgreSQL tests and runtime restart check. The candidate explicitly narrowed this checkpoint to backend work and deferred frontend/browser testing. A test assertion was corrected after inspecting connect-pg-simple's whole-second expiry rounding; exact application expiry remains independently checked. This is an observed engineering correction, not a fabricated accepted/rejected suggestion.

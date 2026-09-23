@@ -36,7 +36,7 @@ Snapshot seats, distance, base, rate, pricing version, solo/estimate at request 
 ## Foundation implementation choices
 
 - REST and npm workspaces keep a small monolith navigable without extra framework infrastructure.
-- PostgreSQL sessions will use `connect-pg-simple`'s sid/sess/expire layout, mapped by Prisma now; actual middleware arrives with auth.
+- PostgreSQL sessions will use `connect-pg-simple`'s sid/sess/expire layout, mapped by Prisma now; middleware is implemented in the backend authentication checkpoint; see authentication.md.
 - Scrypt hashes demo passwords with independent random salts; store algorithm/parameters for future verification. No plaintext password column.
 - Composite role foreign keys enforce driver/passenger ownership in SQL. Partial unique indexes enforce active-resource limits. Membership seat counter consistency remains a transactional service responsibility for the pooling milestone.
 - API health is public and discloses only status. Readiness checks PostgreSQL plus the migrated users table, with bounded query/connection timeouts. No business endpoint stubs returning fabricated success.

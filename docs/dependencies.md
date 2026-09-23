@@ -20,3 +20,10 @@ Official references consulted:
 npm reported four high entries: prisma, @prisma/config, deepmerge-ts, mysql2 (some entries are transitive rollups). Deepmerge-ts has recursive-object stack exhaustion; mysql2 has authentication downgrade and compressed protocol advisories. Prisma CLI brings these into migration/build tooling; this app uses pg, not mysql2, and configuration is local trusted code. npm's proposed automatic fix downgraded Prisma to 6.19.3, a major API change, so no blind audit fix --force was applied.
 
 The API runtime image prunes dev, peer and optional dependencies; all three omission flags are needed because @prisma/client declares the CLI as an optional peer. The final prune audited 104 packages with zero vulnerabilities, and direct inspection confirmed prisma, @prisma/config, deepmerge-ts and mysql2 absent. Migration tooling stays in a separate init target; host npm audit --omit=dev still reports these optional-peer findings. Runtime audit result and Docker verification are recorded in progress.md. These findings remain a documented tooling limitation, to revisit when a stable compatible patched Prisma release is available. Do not claim an all-dependency clean audit.
+
+
+## Backend authentication checkpoint
+
+Added express-session 1.19.0, connect-pg-simple 10.0.0 and express-rate-limit 8.7.0 (resolved in lockfile), plus community TypeScript definitions. Consulted the [session middleware API](https://expressjs.com/en/resources/middleware/session/), [PostgreSQL session-store options](https://github.com/voxpelli/node-connect-pg-simple), and [rate-limit configuration](https://express-rate-limit.mintlify.app/reference/configuration). Inspected the installed store source for Math.ceil expiry rounding, disableTouch and prune/close behavior.
+
+Install/build still report the same four high Prisma-tooling advisories, with no forced upgrades. Final auth runtime pruning audited 115 packages with zero vulnerabilities; the four advisory-related tooling packages remain excluded from the running API image. This does not claim the whole development dependency tree or container OS is vulnerability-free.

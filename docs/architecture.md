@@ -25,9 +25,9 @@ Cancellation and arrival lock the same pool before requests: cancellation either
 
 Booking creation uses unique (passenger_id, idempotency_key) plus normalized payload fingerprint; repeat same key/payload returns the original request (even if terminal), different payload → 409. A same-key race resolves by reading the winner after rollback. Deadlocks/serialization errors get bounded whole-transaction retries; no external side effects inside transactions. Events have unique operation keys to guard replay. These are design commitments, not implemented concurrency protection yet.
 
-## Security plan
+## Security
 
-PostgreSQL-backed express-session/connect-pg-simple, opaque HttpOnly cookies, Secure over HTTPS, SameSite=Lax, session regeneration at login, destruction at logout, expiry and pruning. Synchronizer CSRF token bound to session for all mutations plus origin validation. Rate-limit login/register; derive all identities from session, never payload IDs. Validate Zod inputs and return 404 for inaccessible private resources. Passengers see only their fares; driver member views expose necessary pickup/seat/name data. Avoid session, password, and private payload logging. No authentication routes exist yet.
+PostgreSQL-backed express-session/connect-pg-simple, opaque HttpOnly cookies, Secure over HTTPS, SameSite=Lax, session regeneration at login, destruction at logout, expiry and pruning. Synchronizer CSRF token bound to session for all mutations plus origin validation. Rate-limit login/register; derive all identities from session, never payload IDs. Validate Zod inputs and return 404 for inaccessible private resources. Passengers see only their fares; driver member views expose necessary pickup/seat/name data. Avoid session, password, and private payload logging. All five authentication routes now exist; [authentication details](authentication.md) document fixed expiry, exact CSRF/origin checks, cookie/proxy settings, role middleware and rate limits.
 
 ## Verification layers
 
