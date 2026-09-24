@@ -7,7 +7,13 @@ import {
   type EventType,
 } from "../generated/prisma/client.js";
 import { AuthError } from "../auth/service.js";
-import { soloFare, BASE_POISHA, RATE_POISHA, PRICING_VERSION } from "./fare.js";
+import {
+  soloFare,
+  sharedFare,
+  BASE_POISHA,
+  RATE_POISHA,
+  PRICING_VERSION,
+} from "./fare.js";
 type Tx = Prisma.TransactionClient;
 export type BookingInput = { routeId: string; seats: number };
 export type Page = { limit: number; cursor?: { at: Date; id: string } };
@@ -23,9 +29,26 @@ const vehicleInclude = {
   driver: { select: { id: true, name: true } },
 } as const;
 const bookingInclude = {
+  events: {
+    where: { event_type: "DRIVER_ARRIVED" },
+    select: { metadata: true },
+  },
   route: { include: routeInclude },
   membership: {
-    include: { pool: { include: { vehicle: { include: vehicleInclude } } } },
+    include: {
+      pool: {
+        include: {
+          vehicle: { include: vehicleInclude },
+          _count: {
+            select: {
+              memberships: {
+                where: { request: { status: { not: "CANCELLED" } } },
+              },
+            },
+          },
+        },
+      },
+    },
   },
 } as const;
 const poolInclude = {
@@ -65,6 +88,9 @@ function routeView(r: RouteRow) {
 }
 function bookingView(r: BookingRow) {
   const p = r.membership?.pool;
+  const arrivalPolicy = r.events[0]?.metadata as
+    { pricingVersion?: string } | undefined;
+  const sharedQuote = !r.finalized_at && r.status !== "CANCELLED";
   return {
     id: r.id,
     route: { ...routeView(r.route), demoDistanceMeters: r.distance_meters },
@@ -74,7 +100,14 @@ function bookingView(r: BookingRow) {
     updatedAt: r.updated_at,
     fare: {
       soloMaximumPoisha: r.solo_maximum_poisha,
-      provisionalPooledPoisha: r.provisional_pooled_poisha,
+      provisionalPooledPoisha: sharedQuote
+        ? sharedFare(r.solo_maximum_poisha)
+        : r.provisional_pooled_poisha,
+      poolingPricingVersion: sharedQuote ? PRICING_VERSION : null,
+      finalPricingVersion: r.finalized_at
+        ? (arrivalPolicy?.pricingVersion ?? r.pricing_version)
+        : null,
+      discountBps: r.discount_bps,
       finalFarePoisha: r.final_fare_poisha,
       finalizedAt: r.finalized_at,
       currency: "BDT",
@@ -84,6 +117,7 @@ function bookingView(r: BookingRow) {
       ? {
           id: p.id,
           status: p.status,
+          sharing: p._count.memberships > 1,
           driver: p.vehicle.driver,
           vehicle: {
             id: p.vehicle.id,
@@ -261,12 +295,14 @@ export function createRideService(db: PrismaClient) {
     toBooking?: BookingStatus,
     fromPool?: PoolStatus,
     toPool?: PoolStatus,
+    metadata: Prisma.InputJsonValue = {},
   ) {
     await tx.rideEvent.create({
       data: {
         actor_id: actor,
         request_id: subject.requestId,
         pool_id: subject.poolId,
+        metadata,
         event_type: type,
         operation_key: type + ":" + (subject.requestId ?? subject.poolId),
         from_booking_status: fromBooking,
@@ -275,6 +311,92 @@ export function createRideService(db: PrismaClient) {
         to_pool_status: toPool,
       },
     });
+  }
+
+  // These helpers only run inside write(), after taking the shared ride lock.
+  async function assign(
+    tx: Tx,
+    actor: string,
+    request: { id: string; seats: number },
+    target: { id: string; capacity_snapshot: number },
+  ) {
+    const changed = await tx.pool.updateMany({
+      where: {
+        id: target.id,
+        status: "ACCEPTED",
+        allocated_seats: { lte: target.capacity_snapshot - request.seats },
+      },
+      data: { allocated_seats: { increment: request.seats } },
+    });
+    if (changed.count !== 1)
+      fail(
+        "CAPACITY_CONFLICT",
+        "This pool no longer has room for the whole booking.",
+      );
+    await tx.poolMembership.create({
+      data: {
+        request_id: request.id,
+        pool_id: target.id,
+        seats: request.seats,
+      },
+    });
+    await tx.rideRequest.update({
+      where: { id: request.id },
+      data: { status: "MATCHED" },
+    });
+    await event(
+      tx,
+      actor,
+      "REQUEST_MATCHED",
+      { requestId: request.id, poolId: target.id },
+      "REQUESTED",
+      "MATCHED",
+    );
+  }
+  async function matchNew(tx: Tx, actor: string, request: BookingRow) {
+    const candidates = await tx.$queryRaw<
+      { id: string; capacity_snapshot: number }[]
+    >`
+      SELECT p.id, p.capacity_snapshot FROM pools p
+      JOIN vehicles v ON v.id = p.vehicle_id
+      JOIN driver_profiles d ON d.user_id = v.driver_id
+      WHERE p.status = 'ACCEPTED' AND d.online
+        AND p.pickup_zone_id = ${request.route.pickup_zone_id}::uuid
+        AND p.route_group = ${request.route.compatibility_group}
+        AND p.capacity_snapshot - p.allocated_seats >= ${request.seats}
+      ORDER BY p.created_at ASC, p.id ASC LIMIT 1`;
+    if (candidates[0]) await assign(tx, actor, request, candidates[0]);
+  }
+  async function fillWaiting(tx: Tx, actor: string, poolId: string) {
+    const target = await tx.pool.findUniqueOrThrow({
+      where: { id: poolId },
+      include: {
+        vehicle: { include: { driver: { include: { driver_profile: true } } } },
+      },
+    });
+    if (
+      target.status !== "ACCEPTED" ||
+      !target.vehicle.driver.driver_profile?.online
+    )
+      return;
+    let remaining = target.capacity_snapshot - target.allocated_seats;
+    // Each iteration fills a seat; skip oversized bookings without splitting them.
+    while (remaining > 0) {
+      const next = await tx.rideRequest.findFirst({
+        where: {
+          status: "REQUESTED",
+          seats: { lte: remaining },
+          route: {
+            pickup_zone_id: target.pickup_zone_id,
+            compatibility_group: target.route_group,
+          },
+        },
+        orderBy: [{ created_at: "asc" }, { id: "asc" }],
+      });
+      if (!next) break;
+      await assign(tx, actor, next, target);
+      remaining -= next.seats;
+    }
   }
   return {
     zones: () =>
@@ -297,11 +419,11 @@ export function createRideService(db: PrismaClient) {
         const { fare } = await estimate(tx, input);
         return {
           soloMaximumPoisha: fare,
-          provisionalPooledPoisha: fare,
+          provisionalPooledPoisha: sharedFare(fare),
           currency: "BDT",
           pricingVersion: PRICING_VERSION,
           provisional: true,
-          poolingAvailable: false,
+          poolingAvailable: true,
         };
       }),
     create: (passengerId: string, input: BookingInput, key: string) =>
@@ -351,7 +473,7 @@ export function createRideService(db: PrismaClient) {
             base_fare_poisha: BASE_POISHA,
             rate_per_km_poisha: RATE_POISHA,
             solo_maximum_poisha: fare,
-            provisional_pooled_poisha: fare,
+            provisional_pooled_poisha: sharedFare(fare),
           },
           include: bookingInclude,
         });
@@ -363,7 +485,11 @@ export function createRideService(db: PrismaClient) {
           undefined,
           "REQUESTED",
         );
-        return { created: true, booking: bookingView(r) };
+        await matchNew(tx, passengerId, r);
+        return {
+          created: true,
+          booking: bookingView(await booking(tx, r.id, passengerId)),
+        };
       }),
     booking: (passengerId: string, id: string) =>
       read(async (tx) => bookingView(await booking(tx, id, passengerId))),
@@ -442,6 +568,8 @@ export function createRideService(db: PrismaClient) {
           r.status,
           "CANCELLED",
         );
+        if (r.membership)
+          await fillWaiting(tx, passengerId, r.membership.pool_id);
         return bookingView(await booking(tx, id, passengerId));
       }),
     profile: (driverId: string) => read((tx) => profile(tx, driverId)),
@@ -523,17 +651,10 @@ export function createRideService(db: PrismaClient) {
           data: {
             vehicle_id: driver.vehicle.id,
             capacity_snapshot: driver.vehicle.capacity,
-            allocated_seats: r.seats,
+            allocated_seats: 0,
             pickup_zone_id: r.route.pickup_zone_id,
             route_group: r.route.compatibility_group,
           },
-        });
-        await tx.poolMembership.create({
-          data: { request_id: id, pool_id: p.id, seats: r.seats },
-        });
-        await tx.rideRequest.update({
-          where: { id },
-          data: { status: "MATCHED" },
         });
         await event(
           tx,
@@ -545,14 +666,8 @@ export function createRideService(db: PrismaClient) {
           undefined,
           "ACCEPTED",
         );
-        await event(
-          tx,
-          driverId,
-          "REQUEST_MATCHED",
-          { requestId: id, poolId: p.id },
-          "REQUESTED",
-          "MATCHED",
-        );
+        await assign(tx, driverId, r, p);
+        await fillWaiting(tx, driverId, p.id);
         return poolView(await pool(tx, p.id, driverId));
       }),
     pool: (driverId: string, id: string) =>
@@ -649,8 +764,11 @@ export function createRideService(db: PrismaClient) {
               where: { id: m.request_id },
               data: {
                 status: "DRIVER_ARRIVED",
-                final_fare_poisha: m.request.solo_maximum_poisha,
-                discount_bps: 0,
+                final_fare_poisha:
+                  members.length >= 2
+                    ? sharedFare(m.request.solo_maximum_poisha)
+                    : m.request.solo_maximum_poisha,
+                discount_bps: members.length >= 2 ? 2000 : 0,
                 finalized_at: now,
               },
             });
@@ -663,6 +781,11 @@ export function createRideService(db: PrismaClient) {
               "DRIVER_ARRIVED",
               "ACCEPTED",
               "DRIVER_ARRIVED",
+              {
+                pricingVersion: PRICING_VERSION,
+                discountBps: members.length >= 2 ? 2000 : 0,
+                activeBookings: members.length,
+              },
             );
           }
         } else if (action === "start") {

@@ -31,6 +31,7 @@ for (const args of [
     resolve("../../node_modules/vitest/vitest.mjs"),
     "run",
     "src/rides/rides.integration.test.ts",
+    "src/rides/pooling.integration.test.ts",
     "--maxWorkers=1",
   ],
 ]) {
