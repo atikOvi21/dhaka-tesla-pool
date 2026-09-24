@@ -15,12 +15,15 @@ export type Booking = {
   allowedActions: string[];
   fare: {
     soloMaximumPoisha: number;
+    provisionalPooledPoisha: number;
+    discountBps: number | null;
     finalFarePoisha: number | null;
     finalizedAt: string | null;
   };
   pool: {
     id: string;
     status: string;
+    sharing: boolean;
     driver: { name: string };
     vehicle: { name: string; capacity: number };
   } | null;

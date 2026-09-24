@@ -7,7 +7,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router";
-import { BookingForm, RideWorkspace } from "./RideWorkspace";
+import { BookingForm, BookingCard, RideWorkspace } from "./RideWorkspace";
 import { useResource } from "./hooks";
 import { apiPost, apiMutation, apiGet, ApiError } from "../api";
 vi.mock("../auth/AuthContext", () => ({
@@ -43,21 +43,48 @@ afterEach(() => {
   sessionStorage.clear();
 });
 async function preview() {
-  vi.mocked(apiPost).mockResolvedValue({ soloMaximumPoisha: 5000 });
+  vi.mocked(apiPost).mockResolvedValue({
+    soloMaximumPoisha: 5000,
+    provisionalPooledPoisha: 4000,
+  });
   fireEvent.click(screen.getByRole("button", { name: "Preview fare" }));
   await screen.findByText("50.00 BDT");
 }
 describe("booking intent and polling behavior", () => {
   it("clears an uncertain intent after recovering its active booking", async () => {
-    sessionStorage.setItem("dtp-booking-intent:test-passenger", JSON.stringify({key:"old-key",routeId:route.id,seats:1}));
-    vi.mocked(apiGet).mockImplementation(async path => {
-      if(path === "/ride-requests/active") return {id:"recovered",route,seats:1,status:"REQUESTED",fare:{soloMaximumPoisha:5000,finalFarePoisha:null},pool:null,allowedActions:["cancel"]} as never;
-      if(path === "/routes") return [route] as never;
-      return {items:[],nextCursor:null} as never;
+    sessionStorage.setItem(
+      "dtp-booking-intent:test-passenger",
+      JSON.stringify({ key: "old-key", routeId: route.id, seats: 1 }),
+    );
+    vi.mocked(apiGet).mockImplementation(async (path) => {
+      if (path === "/ride-requests/active")
+        return {
+          id: "recovered",
+          route,
+          seats: 1,
+          status: "REQUESTED",
+          fare: {
+            soloMaximumPoisha: 5000,
+            provisionalPooledPoisha: 4000,
+            finalFarePoisha: null,
+          },
+          pool: null,
+          allowedActions: ["cancel"],
+        } as never;
+      if (path === "/routes") return [route] as never;
+      return { items: [], nextCursor: null } as never;
     });
-    render(<MemoryRouter initialEntries={["/passenger"]}><RideWorkspace driver={false}/></MemoryRouter>);
-    await screen.findByRole("heading",{name:"Waiting for a driver"});
-    await waitFor(() => expect(sessionStorage.getItem("dtp-booking-intent:test-passenger")).toBeNull());
+    render(
+      <MemoryRouter initialEntries={["/passenger"]}>
+        <RideWorkspace driver={false} />
+      </MemoryRouter>,
+    );
+    await screen.findByRole("heading", { name: "Waiting for a driver" });
+    await waitFor(() =>
+      expect(
+        sessionStorage.getItem("dtp-booking-intent:test-passenger"),
+      ).toBeNull(),
+    );
   });
 
   it("retains the same request key after an uncertain failure, including a remount", async () => {
@@ -171,5 +198,69 @@ describe("booking intent and polling behavior", () => {
     expect(restore).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
     await waitFor(() => expect(restore).toHaveBeenCalledTimes(1));
+  });
+});
+
+describe("shared fare presentation", () => {
+  const booking = {
+    id: "own-booking",
+    route,
+    seats: 1,
+    status: "MATCHED",
+    createdAt: "2026-09-24",
+    allowedActions: ["cancel"],
+    fare: {
+      soloMaximumPoisha: 5000,
+      provisionalPooledPoisha: 4000,
+      finalFarePoisha: null,
+      finalizedAt: null,
+      discountBps: null,
+    },
+    pool: {
+      id: "pool",
+      status: "ACCEPTED",
+      sharing: true,
+      driver: { name: "Jashim" },
+      vehicle: { name: "Bullet", capacity: 3 },
+    },
+  };
+  it("labels shared fare as provisional and shows only own booking", () => {
+    render(
+      <MemoryRouter>
+        <BookingCard booking={booking} refresh={vi.fn()} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText(/Shared ride assigned/)).toBeVisible();
+    expect(screen.getByText(/at least two separate bookings/)).toBeVisible();
+    expect(screen.getByText("50.00 BDT")).toBeVisible();
+    expect(screen.getByText("40.00 BDT")).toBeVisible();
+    expect(screen.queryByText(/Final fare/)).not.toBeInTheDocument();
+  });
+  it("shows fixed final fare without continuing to promise a provisional discount", () => {
+    render(
+      <MemoryRouter>
+        <BookingCard
+          booking={{
+            ...booking,
+            status: "IN_PROGRESS",
+            allowedActions: [],
+            fare: {
+              ...booking.fare,
+              finalFarePoisha: 4000,
+              finalizedAt: "2026-09-24",
+              discountBps: 2000,
+            },
+          }}
+          refresh={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText(/Final fare/)).toHaveTextContent("40.00 BDT");
+    expect(
+      screen.queryByText(/Provisional shared fare/),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Cancel request" }),
+    ).not.toBeInTheDocument();
   });
 });
