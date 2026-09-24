@@ -31,3 +31,7 @@ Install/build still report the same four high Prisma-tooling advisories, with no
 ## Frontend authentication checkpoint
 
 Added development-only Vitest/jsdom, React Testing Library/user-event/jest-dom and Playwright. Exact versions are in the lockfile. Browser tests use installed Microsoft Edge on Windows and the same Docker images with isolated tmpfs PostgreSQL. No additional frontend runtime dependency was needed. Docker full dependency installation still reported four high tooling advisories; API runtime pruning reported 142 packages and zero vulnerabilities. This is not an all-dependency or OS clean-audit claim.
+
+## Ride lifecycle checkpoint
+
+No new dependencies. Existing Prisma/pg transactions, Zod, native fetch, React/Router and Playwright provide the lifecycle. Full Docker install retained four high tooling advisories; the API runtime prune audited 142 packages with zero vulnerabilities. PostgreSQL tests emitted a pg deprecation warning about concurrent query calls scheduled by the installed stack; pg8 remains installed and all tests passed. No claim is made about compatibility with a future pg9 upgrade.

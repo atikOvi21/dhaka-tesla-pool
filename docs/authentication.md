@@ -1,6 +1,6 @@
 # Authentication
 
-Implemented routes: GET /api/v1/auth/csrf, POST /auth/register, POST /auth/login, POST /auth/logout, GET /auth/me (all under /api/v1). Frontend authentication is implemented and verified. Business endpoints remain planned.
+Implemented routes: GET /api/v1/auth/csrf, POST /auth/register, POST /auth/login, POST /auth/logout, GET /auth/me (all under /api/v1). Frontend authentication is implemented and verified. The single-booking ride endpoints are now implemented; see [ride lifecycle](ride-lifecycle.md).
 
 ## Contract and security decisions
 
@@ -56,7 +56,7 @@ AuthContext restores GET /auth/me before routing; loading never flashes the logi
 
 The fetch wrapper sends same-origin cookies and obtains a fresh CSRF token before every mutation. It also refreshes after successful login/registration. Logout discards authenticated state; the next mutation bootstraps a new anonymous token. No credentials are kept in localStorage. Mutations are never automatically replayed, including when post-login token refresh fails; Retry checks the session instead. Password inputs are cleared after attempted requests, while name/email survive recoverable failures. Form fields and submit buttons are disabled during submission.
 
-Role guards prevent the opposite workspace from rendering and link to the correct workspace. These are UI controls; server authorization remains authoritative. Landing pages explicitly mark all ride features as upcoming.
+Role guards prevent the opposite workspace from rendering and link to the correct workspace. These are UI controls; server authorization remains authoritative. The role workspaces now provide the single-booking ride lifecycle; shared pooling remains upcoming.
 
 ### Reproduce browser verification
 
@@ -86,4 +86,4 @@ Two browser tests cover the full desktop journey and a mobile registration/keybo
 6. Review registration and login at narrow mobile widths and use Tab/Enter. Check labels, focus indicators, validation and disabled submission.
 7. Open http://localhost:8080/foundation for connectivity. Production deep links are served by Nginx, not just Vite.
 
-No password reset/email verification, per-device session management, or business flows are included. No public HTTPS deployment was tested. Review the full authentication milestone before merging feature/auth into master. The next milestone is the complete single-passenger ride lifecycle; it has not started.
+Authentication excludes password reset/email verification and per-device session management. No public HTTPS deployment was tested. Authentication was reviewed and fast-forwarded into master at 641615a before feature/ride-lifecycle began. See the ride guide for the new business flows.

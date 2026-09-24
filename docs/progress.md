@@ -1,6 +1,52 @@
 # Progress
 
-## Current checkpoint - complete authentication verified
+## Current checkpoint - single-booking ride lifecycle verified
+
+Verified 24 September 2026. Branch: **feature/ride-lifecycle**. Authentication was integrated into master first; rides remain on their feature branch for review. No push, deployment, release branch, history rewrite, or shared-pooling implementation.
+
+### Authentication integration
+
+Inspected the actual five outstanding paths: apps/api/src/app.test.ts and apps/api/src/auth/{auth.integration.test.ts,config.ts,index.ts,service.ts}. Compared each with HEAD through the same TypeScript formatter and reviewed the remaining method-chain whitespace diff. Confirmed formatting only, with no altered string contents or behavior. Backend typecheck, 19 isolated PostgreSQL auth tests and five API tests passed. Preserved the edits in **641615a - style(auth): preserve existing backend formatting**. Fast-forwarded feature/auth into master locally, then created feature/ride-lifecycle from master.
+
+### Completed behavior
+
+All requested reference, passenger and driver endpoints are implemented. Passenger UI supports route/seat selection, solo fare preview, idempotent creation, active booking, cancellation, details and history. Driver UI supports online/offline, paginated waiting requests, acceptance, arrival, start, individual drop-off, pool completion, details and history. Five-second polling avoids overlapping reads and aborts on navigation/logout. Authentication, CSRF, retryable failures, role guards, accessibility and /foundation remain available. Protected detail/history deep links work.
+
+One booking per pool may reserve multiple seats. No permanent single-booking constraint was added. Shared matching, extra bookings and pooling discounts are pending. Solo 3 km / one seat is 50 BDT; final fare freezes at arrival. Pre-arrival cancellation has no charge. Same-key retries return the original booking even after cancellation; changed payload conflicts. The browser retains uncertain submission intent in sessionStorage, clears it when confirmed/recovered, and never automatically replays mutations.
+
+Every ride mutation acquires the same PostgreSQL transaction advisory lock before reading business state. This provides consistent cross-process serialization at demo scale, including cancellation/arrival and competing acceptance. Requests, memberships, allocated seats, fare finalization and events commit atomically. Reads use repeatable-read transactions. Explicit limitations and the future row-lock plan are in [ride lifecycle](ride-lifecycle.md) and [architecture](architecture.md).
+
+### Checks actually run
+
+- Authentication integration gate: backend typecheck, **19 auth/PostgreSQL tests + 5 shared API tests passed**.
+- **17 ride/PostgreSQL tests passed** through npm run test:rides -w @dtp/api on disposable PostgreSQL :5434. Covers complete lifecycle, half-up rounding and seats, immutable fare snapshots, invalid inputs, active uniqueness, concurrent idempotent retries, competing acceptance, offline acceptance, cancellation/acceptance and cancellation/arrival races, availability race, ownership/privacy, histories, repeated actions and rollback after a forced later database-write failure.
+- **22 frontend tests passed** through npm test -w @dtp/web: 16 authentication + 6 ride tests. Covers retained/recovered/new request keys, duplicate submissions, polling cleanup and error/expiry handling. An initial recovery assertion ran before its React cleanup effect; it now correctly waits for that effect.
+- **5 shared API tests passed again** after ride integration.
+- **One real ride browser journey passed** using separate Nusrat/Jashim contexts against isolated Nginx/API/PostgreSQL :8081. Covered lost successful booking response and reload recovery, complete lifecycle at 50 BDT, both histories, direct detail navigation, refresh, a two-seat matched cancellation, zero remaining allocation, going offline and no browser errors.
+- **Two existing authentication/mobile browser regressions passed** against the same isolated stack. No browser tooling blocker.
+- Root npm run typecheck and npm run build passed for both workspaces.
+- Full docker compose build passed. Final web-only rebuild passed after updating /foundation's status text. docker compose up --no-build -d --wait passed with main database/API/web healthy and init successful.
+- Main :8080 readiness and routes returned 200. Direct /passenger/history, /driver/history and /foundation returned the SPA entry.
+- Desktop passenger and mobile driver ride screenshots were visually inspected; no overflow in the browser checks. Screenshots are under docs/images.
+- git diff --check passed.
+- No unrelated foundation test cycle or development-data reset. Backend fixtures used unique test identities/routes in the disposable database; browser fixtures lived in a separate tmpfs stack. Both test stacks were stopped/removed afterward. Main :8080 remains running.
+- Docker full dependency installation still reports four high tooling advisories; runtime prune audits 142 packages with zero vulnerabilities. No forced upgrade or all-dependency clean claim. Prisma/pg emitted a future pg@9 concurrent-query deprecation warning during tests; installed pg8 tests passed.
+
+### Commits and handoff
+
+- **641615a** - style(auth): preserve existing backend formatting (included in master)
+- **359bd3a** - feat(rides): implement transactional single-booking lifecycle
+- **590368d** - feat(rides): add passenger and driver journey screens
+- Documentation checkpoint: **docs(rides): record lifecycle verification and demo guide** (see git log for its hash).
+- No outstanding application/user edits are intended to remain; final git status is checked after the documentation commit.
+
+Use [exact manual demonstration steps and test commands](ride-lifecycle.md#manual-demonstration). Login at http://localhost:8080/login in two independent browser sessions: nusrat@demo.dhaka.test and jashim@demo.dhaka.test, both initial password DemoOnly!Dhaka2026. Passenger and driver histories are /passenger/history and /driver/history.
+
+No milestone blocker remains. Ready for review and the next milestone: shared pooling and last-seat concurrency. That milestone has not started. The current acceptance races do not claim multi-booking last-seat safety. Remaining limitations include coarse serialized ride writes, no shared matching/discount, process-local authentication rate limits, no account recovery/email verification, no public HTTPS deployment, and the recorded tooling advisories. Candidate AI accepted/rejected examples still need actual candidate input.
+
+---
+
+## Historical checkpoint - complete authentication verified
 
 Branch: **feature/auth**. Backend authentication was preserved; no backend integration change was needed. Frontend work uses React, straightforward TypeScript, React Router, CSS Modules and native fetch. No ride features, merge, push or deployment.
 

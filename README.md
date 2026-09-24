@@ -4,7 +4,7 @@ Share a seat. Split the fare. Survive Dhaka traffic.
 
 A small ride-pooling MVP for RoBenDevs’ Software Engineer Internship assessment. Jashim drives Bullet, a three-seat vehicle; Nusrat, Rafiq, and Shirin request compatible trips. The eventual product must keep each passenger's fare private and never oversell Bullet.
 
-**Status: foundation and complete frontend/backend authentication implemented and verified.** The next milestone is the single-passenger ride lifecycle. Submission deadline supplied by the candidate: **27 September 2026, 23:59 Bangladesh time**. Requirements source: [supplied PRD](Dhaka_Tesla_Pool_PRD_Internship.pdf), all five pages read.
+**Status: authentication and the complete single-booking ride lifecycle are implemented and verified.** Shared pooling is the next milestone. Submission deadline supplied by the candidate: **27 September 2026, 23:59 Bangladesh time**. Requirements source: [supplied PRD](Dhaka_Tesla_Pool_PRD_Internship.pdf), all five pages read.
 
 ## Implemented versus planned
 
@@ -12,7 +12,9 @@ Implemented: PostgreSQL-backed authentication (passenger registration, seeded pa
 
 Implemented UI: passenger registration, both-role login, session restoration, role-protected landing pages, logout, retryable failures and accessible responsive forms.
 
-Planned: request creation/idempotency, matching/capacity services, lifecycle/cancellation, fare calculations, history dashboards, polling, and the PRD's business/concurrency tests. The schema prepares for these; it does not mean they work.
+Implemented rides: route/seat selection, solo fare previews, idempotent requests, driver availability/acceptance, arrival, start, drop-off, completion, valid cancellation, histories and five-second polling. One booking per pool can reserve multiple seats. Transactions and real PostgreSQL tests cover acceptance/cancellation races.
+
+Planned: shared matching, additional bookings in a pool, pooling discounts and shared last-seat concurrency tests. The one-booking limit is temporary, with no permanent schema restriction.
 
 Public deployment URL: **pending**. Demo video (maximum six minutes): **pending**. Authentication screenshots: [login](docs/images/auth-login-desktop.png), [passenger](docs/images/auth-passenger-desktop.png), [mobile registration](docs/images/auth-register-mobile.png). Foundation screenshots: [desktop](docs/images/foundation-desktop.png) / [mobile](docs/images/foundation-mobile.png).
 
@@ -149,17 +151,17 @@ Controllers handle HTTP; later services enforce prices, ownership, state and sea
 | Zod | Shared TypeScript-friendly input validation; JSON Schema/Ajv if schema interoperability becomes more important. |
 | CSS Modules | Scoped styles without a design-system dependency; utility CSS/component library if repeated UI patterns outgrow this small app. |
 | React state/auth context + fetch | Small UI needs no global cache library; TanStack Query if cache invalidation/loading complexity grows. |
-| 5-second polling (planned) | Easy failure/reconnect behavior; SSE/WebSockets if measured freshness or polling load demands it. |
-| Vitest + Supertest + real PostgreSQL | Fast HTTP tests plus actual DB semantics; Playwright verifies complete authentication journeys against real PostgreSQL. |
+| 5-second ride polling | Easy failure/reconnect behavior; SSE/WebSockets if measured freshness or polling load demands it. |
+| Vitest + Supertest + real PostgreSQL | Fast HTTP tests plus actual DB semantics; Playwright verifies authentication and separate-session passenger/driver journeys against real PostgreSQL. |
 | Docker Compose | Reproducible assessment deployment; managed hosting later for operations. Only free/free-tier providers; provider decision pending. |
 
 [Dependency notes and version-specific references](docs/dependencies.md) record observed advisories and documentation consulted.
 
 ## Workflow and limitations
 
-`feature/* → master → pre-release → release/v1.0.0`. The verified foundation was fast-forwarded into master; complete authentication stays on `feature/auth` for review. Five pre-existing backend formatting edits remain uncommitted and were excluded from frontend commits. No push/deployment, history reset, fabricated commits, or early release branches. Later branches are cut at integration/release stages.
+`feature/* → master → pre-release → release/v1.0.0`. Authentication, including the five verified formatting-only edits in 641615a, was fast-forwarded into master. Ride work is on `feature/ride-lifecycle` for review. No push/deployment, history reset, fabricated commits, or early release branches. Later branches are cut at integration/release stages.
 
-Driver cancellation/reassignment is out of MVP. No real routing, GPS, payments, chat, Redis, queues, or microservices. No public deployment has been attempted. All booking behavior remains absent; do not expose this demo as a working ride service. Seed upserts are individually idempotent; if a seed is interrupted, rerun to finish missing records.
+Driver cancellation/reassignment is out of MVP. No real routing, GPS, payments, chat, Redis, queues, or microservices. No public deployment has been attempted. Single-booking demo rides work; shared pooling remains pending. Seed upserts are individually idempotent; if a seed is interrupted, rerun to finish missing records.
 
 ## AI usage — observed record
 
@@ -176,8 +178,16 @@ Backend checkpoint AI record: Codex implemented the user-requested auth API, ses
 
 ## Frontend authentication verification
 
-See [the authentication guide](docs/authentication.md#frontend-authentication) for isolated browser tests and manual steps. Run `npm test -w @dtp/web` for the 16 focused UI tests; root `npm test` currently runs API tests only.
+See [the authentication guide](docs/authentication.md#frontend-authentication) for isolated browser tests and manual steps. Run `npm test -w @dtp/web` for the 22 focused UI tests (16 authentication and 6 rides); root `npm test` currently runs API tests only.
 
 The implementation keeps TypeScript at the boundaries: `src/api.ts` handles requests/errors, `src/auth/AuthContext.tsx` manages session state, `src/auth/AuthPages.tsx` contains forms and role guards, and `src/App.tsx` defines routes. The function bodies use familiar JavaScript/React patterns. Generated Prisma files are not tutorial entry points and should not be edited.
 
 Frontend AI record: Codex implemented the requested forms/session integration and tests, verified real backend browser journeys and desktop/mobile layouts, and preserved pre-existing backend edits. No candidate acceptance/rejection examples were invented.
+
+## Demonstrate the ride lifecycle
+
+Follow the [exact two-window demonstration and test commands](docs/ride-lifecycle.md#manual-demonstration). Open http://localhost:8080/login in separate browser sessions for Nusrat and Jashim, then use /passenger and /driver. One seat from Banani to Mohakhali costs 50 BDT; fare becomes fixed at arrival. Histories are at /passenger/history and /driver/history.
+
+Ride screenshots: [passenger desktop](docs/images/ride-passenger-desktop.png), [driver mobile](docs/images/ride-driver-mobile.png).
+
+Ride AI record: Codex inspected and normalized the five outstanding diffs before committing them separately, integrated authentication with preserved history, implemented the requested lifecycle and tests, and verified it in separate browser contexts. The coarse PostgreSQL advisory lock is an explicit implementation trade-off for this milestone, not a candidate-endorsed scalability claim. During verification, a recovered intent cleanup assertion was changed to await its React effect; the browser independently verified successful recovery after a lost booking response.
