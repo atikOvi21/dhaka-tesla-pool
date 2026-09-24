@@ -13,7 +13,8 @@
     "db:generate": "prisma generate --config prisma7.config.ts",
     "db:migrate": "prisma migrate deploy --config prisma7.config.ts",
     "db:seed": "prisma db seed --config prisma7.config.ts",
-    "test:auth": "tsx scripts/test-auth.ts"
+    "test:auth": "tsx scripts/test-auth.ts",
+    "test:rides": "tsx scripts/test-rides.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.10.0",
