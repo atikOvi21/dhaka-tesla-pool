@@ -147,6 +147,20 @@ describe("single booking lifecycle on real PostgreSQL", () => {
     expect((await service.availability(d.id, false)).online).toBe(false);
     await code(service.accept(d.id, r.id));
   });
+
+  it("rolls back fare, status and event writes if a later database write fails", async () => {
+    const {p,d,r}=await fixture(), pool=await service.accept(d.id,r.id);
+    const blocker=await db.rideEvent.create({data:{actor_id:d.id,request_id:r.id,pool_id:pool.id,event_type:"DRIVER_ARRIVED",operation_key:"DRIVER_ARRIVED:"+r.id}});
+    try {
+      await expect(service.transition(d.id,pool.id,"arrive")).rejects.toThrow();
+      const booking=await service.booking(p.id,r.id);
+      expect(booking.status).toBe("MATCHED");
+      expect(booking.fare.finalFarePoisha).toBeNull();
+      expect((await service.pool(d.id,pool.id)).status).toBe("ACCEPTED");
+      await assertAllocation(pool.id);
+    } finally { await db.rideEvent.delete({where:{id:blocker.id}}); }
+    expect((await service.transition(d.id,pool.id,"arrive")).status).toBe("DRIVER_ARRIVED");
+  });
   it("rejects unsupported routes and seats without inserting requests", async () => {
     const p = await passenger();
     for (const input of [

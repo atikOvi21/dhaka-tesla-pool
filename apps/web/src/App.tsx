@@ -52,22 +52,32 @@ export function App() {
                 </SessionGate>
               }
             />
-            <Route
-              path="/passenger"
-              element={
-                <SessionGate>
-                  <ProtectedLanding role="PASSENGER" />
-                </SessionGate>
-              }
-            />
-            <Route
-              path="/driver"
-              element={
-                <SessionGate>
-                  <ProtectedLanding role="DRIVER" />
-                </SessionGate>
-              }
-            />
+            {[
+              "/passenger",
+              "/passenger/history",
+              "/passenger/bookings/:id",
+            ].map((path) => (
+              <Route
+                key={path}
+                path={path}
+                element={
+                  <SessionGate>
+                    <ProtectedLanding role="PASSENGER" />
+                  </SessionGate>
+                }
+              />
+            ))}
+            {["/driver", "/driver/history", "/driver/trips/:id"].map((path) => (
+              <Route
+                key={path}
+                path={path}
+                element={
+                  <SessionGate>
+                    <ProtectedLanding role="DRIVER" />
+                  </SessionGate>
+                }
+              />
+            ))}
             <Route
               path="*"
               element={
@@ -81,7 +91,7 @@ export function App() {
         </main>
         <footer className={styles.footer}>
           <span>Share a seat. Split the fare. Survive Dhaka traffic.</span>
-          <span>Authentication milestone · Demo only</span>
+          <span>Single-booking rides · Demo only</span>
         </footer>
       </div>
     </AuthProvider>

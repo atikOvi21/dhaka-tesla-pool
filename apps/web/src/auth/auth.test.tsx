@@ -1,3 +1,4 @@
+vi.mock("../rides/RideWorkspace", () => ({ RideWorkspace: () => null }));
 import {
   act,
   fireEvent,

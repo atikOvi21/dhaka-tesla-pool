@@ -53,13 +53,26 @@ export async function refreshCsrf() {
   return result.csrfToken;
 }
 
-export async function apiPost<T>(path: string, data: unknown = {}): Promise<T> {
+export function apiPost<T>(path: string, data: unknown = {}): Promise<T> {
+  return apiMutation<T>(path, data);
+}
+
+export async function apiMutation<T>(
+  path: string,
+  data: unknown = {},
+  method: "POST" | "PATCH" = "POST",
+  headers: Record<string, string> = {},
+): Promise<T> {
   // Fetch just before each user action: no stale token cache or browser storage.
   const csrfToken = await refreshCsrf();
   // Never automatically replay a mutation, even after a timeout or CSRF failure.
   return request<T>(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken },
+    method,
+    headers: {
+      ...headers,
+      "Content-Type": "application/json",
+      "X-CSRF-Token": csrfToken,
+    },
     body: JSON.stringify(data),
   });
 }

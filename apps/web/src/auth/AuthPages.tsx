@@ -1,3 +1,4 @@
+import { RideWorkspace } from "../rides/RideWorkspace";
 import {
   useEffect,
   useRef,
@@ -299,20 +300,7 @@ export function ProtectedLanding({ role }: { role: User["role"] }) {
           <button onClick={() => void auth.restore()}>Check session</button>
         </div>
       )}
-      <div className={styles.upcoming}>
-        <span className={styles.badge}>COMING NEXT</span>
-        <h2>
-          {driver
-            ? "Meet your passengers. Manage your trip."
-            : "Your next journey, made simple."}
-        </h2>
-        <p>
-          {driver
-            ? "Driver availability, passenger assignments, and trip controls are not available yet."
-            : "Ride requests, fare estimates, pooling, and trip history are not available yet."}
-        </p>
-        <p>Authentication is ready. Ride features are still being built.</p>
-      </div>
+      <RideWorkspace driver={driver} />
       <Link to="/foundation">Check the system connection</Link>
     </section>
   );

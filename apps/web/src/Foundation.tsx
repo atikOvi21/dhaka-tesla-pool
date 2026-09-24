@@ -81,10 +81,11 @@ export function Foundation() {
           A React frontend, an Express API, and a PostgreSQL database with the
           demo cast and routes. This page verifies their connection.
         </p>
-        <h2>Coming next: ride requests</h2>
+        <h2>Coming next: shared pooling</h2>
         <p>
-          Ride requests, pooling, fares, and driver controls are planned. They
-          are not available yet.
+          Single-booking rides, solo fares, driver controls, and histories are
+          available from your account. Shared matching and pooling discounts
+          are coming next.
         </p>
       </section>
       <footer className={styles.footer}>
