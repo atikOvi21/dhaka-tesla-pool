@@ -12,7 +12,7 @@ Sections 3–6 require passenger and driver flows, capacity-safe shared rides, i
 - Matching: same pickup zone AND same compatibility group, enough free seats, ACCEPTED pool, online driver. Banani → Mohakhali (3,000 m) and Banani → Gulshan 1 (4,000 m) share `banani-east-demo`. These are invented demo distances and compatibility, not real road routing. No pool fit leaves REQUESTED. Acceptance creates a pool and considers compatible waiting requests by created_at, id, skipping those that do not fit.
 - Joining after arrival is forbidden. Drop-offs release allocations without reopening matching. Drivers cannot go offline with an active pool. Driver cancellation/reassignment is outside MVP.
 - Cash only. Passenger cancellation only in REQUESTED/MATCHED; no charge. Arrival freezes fares. Separate drop-offs are supported; pool completion requires every non-cancelled booking completed.
-- Poll active screens approximately every 5 seconds in later milestones. Authentication context only; native fetch wrapper; CSS Modules. Free hosting provider remains undecided.
+- Poll active screens approximately every 5 seconds. Authentication context only; native fetch wrapper; CSS Modules. Free hosting provider remains undecided.
 
 ## Lifecycle
 
@@ -22,15 +22,15 @@ Pool: ACCEPTED → DRIVER_ARRIVED → STARTED → COMPLETED.
 All bookings cancelled before arrival → CANCELLED pool.
 Arrival atomically closes boarding, snapshots final fares, changes active bookings, and writes events. Start updates pool/bookings together. Drop-off completes one booking and releases its membership. Cancellation retains the membership/history and releases only its seats. Repeated actions must not duplicate events/side effects.
 
-## Pricing: solo implemented; shared discount planned
+## Pricing: solo and shared fares implemented
 
 Store integers: 100 poisha = 1 BDT; distance in meters.
-Current solo version `demo-solo-v1`; future shared version `demo-v1`: base 2,000 poisha/seat; rate 1,000 poisha/km/seat.
+Current quote and sharing policy `demo-pool-v1`; legacy quote version `demo-solo-v1`: base 2,000 poisha/seat; rate 1,000 poisha/km/seat.
 Solo maximum = roundHalfUp(seats × (basePoisha × 1000 + distanceMeters × ratePoishaPerKm) / 1000).
 Use integer arithmetic (BigInt intermediates) and nonnegative half-up rounding: floor((numerator + denominator/2) / denominator).
 Final = roundHalfUp(soloPoisha × (10000 - discountBps) / 10000).
 Discount is 2,000 basis points (20%) iff at least TWO separate active bookings remain at arrival. Two seats in one booking count as one booking.
-Nusrat: 1 seat × (20 + 3×10) = 50 BDT solo / 40 BDT pooled. Rafiq: 60 / 48 BDT. The current milestone displays only the solo estimate. The 40/48 BDT pooled fares and provisional shared estimates belong to the next milestone.
+Nusrat: 1 seat × (20 + 3×10) = 50 BDT solo / 40 BDT pooled. Rafiq: 60 / 48 BDT. The UI displays the solo maximum and conditional shared estimate before arrival, then the immutable final fare.
 Snapshot seats, distance, base, rate, pricing version, solo/estimate at request creation; actual discount, final fare, and finalization timestamp at arrival. Final remains null until arrival; cancelled requests never finalize. Historical snapshots never use new configuration.
 
 ## Foundation implementation choices
@@ -44,6 +44,6 @@ Snapshot seats, distance, base, rate, pricing version, solo/estimate at request 
 
 No substantive conflict found between the PRD and the supplied plan. Deadline comes from the candidate's request, not the PDF. Public deployment, screenshots of product flows, video, complete business tests, and AI accepted/rejected examples remain later deliverables.
 
-## Single-booking milestone boundary
+## Shared-pooling milestone
 
-One booking per newly accepted pool, potentially multiple seats. No automatic matching, extra memberships or pooling discount yet; no permanent single-membership schema constraint was added. Final fare is the solo snapshot fixed at arrival. Five-second ride polling and histories are implemented. Writes currently share one database advisory lock; see architecture.md for the explicit scale trade-off and future row-lock plan.
+The temporary one-booking application limit is removed. Oldest compatible eligible pools accept whole bookings; acceptance/refill scan waiting requests in stable creation order. All writers retain the same database advisory lock. Existing unfinalized quotes retain stored inputs and become eligible for the current sharing policy from their stored solo maximum; arrival metadata records the applied version. Finalized/completed fares are unchanged. See ride-lifecycle.md for precise compatibility and legacy-response semantics. Deployment/submission readiness is next.

@@ -1,6 +1,6 @@
 # Authentication
 
-Implemented routes: GET /api/v1/auth/csrf, POST /auth/register, POST /auth/login, POST /auth/logout, GET /auth/me (all under /api/v1). Frontend authentication is implemented and verified. The single-booking ride endpoints are now implemented; see [ride lifecycle](ride-lifecycle.md).
+Implemented routes: GET /api/v1/auth/csrf, POST /auth/register, POST /auth/login, POST /auth/logout, GET /auth/me (all under /api/v1). Frontend authentication is implemented and verified. The shared ride endpoints are implemented; see [ride lifecycle](ride-lifecycle.md).
 
 ## Contract and security decisions
 
@@ -56,7 +56,7 @@ AuthContext restores GET /auth/me before routing; loading never flashes the logi
 
 The fetch wrapper sends same-origin cookies and obtains a fresh CSRF token before every mutation. It also refreshes after successful login/registration. Logout discards authenticated state; the next mutation bootstraps a new anonymous token. No credentials are kept in localStorage. Mutations are never automatically replayed, including when post-login token refresh fails; Retry checks the session instead. Password inputs are cleared after attempted requests, while name/email survive recoverable failures. Form fields and submit buttons are disabled during submission.
 
-Role guards prevent the opposite workspace from rendering and link to the correct workspace. These are UI controls; server authorization remains authoritative. The role workspaces now provide the single-booking ride lifecycle; shared pooling remains upcoming.
+Role guards prevent the opposite workspace from rendering and link to the correct workspace. These are UI controls; server authorization remains authoritative. The role workspaces provide the shared ride lifecycle with individual passenger fares and driver drop-offs.
 
 ### Reproduce browser verification
 

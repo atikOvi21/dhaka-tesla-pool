@@ -1,6 +1,50 @@
 # Progress
 
-## Current checkpoint - single-booking ride lifecycle verified
+## Current checkpoint - shared pooling verified
+
+Verified 24 September 2026. Branch: **feature/tesla-pooling**. The starting ride branch was clean; the committed and verified single-booking checkpoint **458ca30** was fast-forwarded into master with history preserved, then this branch was created. Pooling is not merged into master. No push, deployment, release branch, dependency change, schema migration or development reset.
+
+### Completed behavior and decisions
+
+New bookings match the oldest eligible ACCEPTED pool by created_at/id with the same pickup and compatibility group, online driver and enough seats for the whole booking. Otherwise they wait. Acceptance assigns the selected request first, then oldest compatible waiting requests that fit. Pre-arrival cancellation releases only that member's seats and refills a nonempty pool; last-member cancellation cancels the pool without replacing its trip. Cancelled memberships/history remain intact.
+
+Every ride writer retains the same transaction-scoped advisory lock (73421,1) before authoritative reads. Membership, allocation, states and events are atomic; idempotent replays do not rematch or duplicate events. This serializes ride mutations database-wide across API instances and limits throughput. Bounded waits and whole-transaction conflict retries remain; fine-grained locking is deferred.
+
+Arrival closes boarding and finalizes individual fares: at least two distinct active bookings receive 20% off their stored solo maximum. One booking with multiple seats does not qualify. Existing solo half-up rounding is preserved; discounted totals use integer BigInt arithmetic with half-up rounding to poisha. Nusrat/Rafiq pay 4000/4800 poisha. Starting updates all active bookings; independent drop-offs release seats once; pool completion requires all non-cancelled bookings complete. No new member joins after arrival. Cancellation/arrival follows transaction order.
+
+Pricing policy is demo-pool-v1. Existing unfinalized bookings retain original quote inputs/version and can qualify based on their stored solo maximum. Arrival event metadata records the applied policy. Finalized fares are not rewritten. Passenger responses expose only their own fares/details and a sharing indicator; drivers see member names/routes/seats/statuses, without emails or fares.
+
+The existing frontend now explains conditional shared estimates versus final fares, shared assignment, waiting for suitable capacity and all member statuses. Driver polling refreshes membership and offers independent drop-offs, preventing premature completion. Authentication, reload recovery, cancellation and idempotency are preserved. TypeScript remains straightforward at API/component boundaries.
+
+### Checks actually run
+
+- **32 real-PostgreSQL ride tests passed**: 17 existing lifecycle tests plus 15 pooling tests through npm run test:rides -w @dtp/api. Fixtures use isolated identities/routes in disposable PostgreSQL, never the development database.
+- Last-seat competition ran three repetitions through two Express apps with independent Prisma adapters/connections and distinct PostgreSQL backend PIDs: two different passengers competed concurrently, exactly one joined and the other waited. Tests also cover capacity/multiple seats, pickup/group mismatch, stable matching order, idempotency, cancellation/refill/last-member cancellation, joining/cancellation versus arrival, rollback, independent drop-offs, immutable fares, 40/48 BDT examples, legacy quotes and privacy/ownership.
+- **19 PostgreSQL authentication tests and 5 shared API tests passed**, bringing backend verification to 56 tests.
+- **24 frontend tests passed** (16 auth + 8 rides), including conditional/final fare presentation and existing recovery/polling/error checks.
+- Root **npm run typecheck** and **npm run build** passed for both workspaces. Frontend tests/typecheck were rerun after the final boarding-status text correction; the final Docker web build also passed.
+- Four real-backend browser journeys passed across the initial full invocation and one targeted rerun: desktop auth, mobile auth, existing solo lifecycle and new pooling lifecycle. The first pooling attempt failed in test setup because its readiness check omitted the Playwright request fixture. Fixed that fixture and reran the pooling journey successfully; this is not reported as a single all-green full-suite invocation.
+- Pooling browser used five independent cookie contexts: Jashim online, Nusrat accepted, Rafiq joined, Shirin filled seat three, extra registered passenger stayed waiting. Arrival finalized 40/48/40 BDT; individual drop-offs, guarded completion, refresh and histories passed. A second pre-arrival cancellation left Nusrat assigned and finalized her solo 50 BDT fare. No browser page errors. Passenger privacy was checked from the actual API response.
+- Desktop passenger and mobile driver pooling screenshots were visually inspected; the mobile overflow assertion passed. New and refreshed regression screenshots are in docs/images.
+- Full Docker build initially failed on registry DNS; one retry using docker compose build --pull=false succeeded. A final web-only rebuild applied the last UI text correction. No unrelated tooling troubleshooting or repeated unchanged builds.
+- **docker compose up --no-build -d --wait passed**: main PostgreSQL/API/web healthy, init exited 0. Main :8080 readiness and route APIs returned 200; direct /passenger, /driver, both history routes and /foundation returned the SPA entry.
+- git diff --check passed before implementation and checkpoint commits. Disposable browser and PostgreSQL test stacks were stopped/removed afterward; main :8080 stays running with its development volume preserved.
+- Runtime dependency prune reported 142 packages and zero vulnerabilities. The previously recorded four high tooling advisories remain a release-review item; no fresh all-dependency clean audit is claimed. PostgreSQL tests emitted the existing future pg@9 concurrent-query deprecation warning; installed pg8 passed.
+
+### Commits and handoff
+
+- **71494d4 - feat(pooling): match shared rides and finalize individual fares**
+- **0c8ebb6 - feat(pooling): show shared assignments and conditional fares**
+- Documentation checkpoint: **docs(pooling): record shared-capacity verification and release handoff** (see git log for its hash).
+- All outstanding changes at this checkpoint belong to this milestone; there were no pre-existing uncommitted user edits. Final working-tree status is checked after the documentation commit.
+
+Use the [exact separate-session demonstration](ride-lifecycle.md#manual-demonstration) at http://localhost:8080/login. The initial demo password is DemoOnly!Dhaka2026 for nusrat/rafiq/shirin/jashim@demo.dhaka.test. The guide includes full-capacity waiting, individual drop-offs and pre-arrival cancellation. /foundation remains accessible.
+
+No shared-pooling milestone blocker remains; ready for review before merging. The next milestone is **deployment and submission readiness**, not more product features. Remaining release work: public HTTPS deployment and secure cookie/proxy/origin configuration, accessible repository/submission path, a maximum-six-minute demo video, actual candidate AI accepted/rejected examples, and tooling advisory review. Limits remain database-wide serialized ride writes, process-local auth rate limits, simplified configured routes, and no account recovery/email verification. No deployment or submission readiness work was started.
+
+---
+
+## Historical checkpoint - single-booking ride lifecycle verified
 
 Verified 24 September 2026. Branch: **feature/ride-lifecycle**. Authentication was integrated into master first; rides remain on their feature branch for review. No push, deployment, release branch, history rewrite, or shared-pooling implementation.
 
