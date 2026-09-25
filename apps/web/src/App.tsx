@@ -91,7 +91,7 @@ export function App() {
         </main>
         <footer className={styles.footer}>
           <span>Share a seat. Split the fare. Survive Dhaka traffic.</span>
-          <span>Single-booking rides · Demo only</span>
+          <span>Shared rides · Demo only</span>
         </footer>
       </div>
     </AuthProvider>

@@ -42,7 +42,7 @@ function RouteText({ route, seats }: { route: Route; seats: number }) {
     </p>
   );
 }
-function BookingCard({
+export function BookingCard({
   booking,
   refresh,
 }: {
@@ -55,14 +55,42 @@ function BookingCard({
       <h2>{statusLabel(booking.status)}</h2>
       <RouteText route={booking.route} seats={booking.seats} />
       <p>
-        {booking.fare.finalFarePoisha === null ? "Solo estimate" : "Final fare"}
-        :{" "}
+        {booking.fare.finalFarePoisha === null ? "Solo maximum" : "Final fare"}:{" "}
         <strong>
           {money(
             booking.fare.finalFarePoisha ?? booking.fare.soloMaximumPoisha,
           )}
         </strong>
       </p>
+      {booking.fare.finalFarePoisha === null &&
+        booking.status !== "CANCELLED" && (
+          <p>
+            Provisional shared fare (20% off):{" "}
+            <strong>{money(booking.fare.provisionalPooledPoisha)}</strong>.
+            Applies only if at least two separate bookings remain when the
+            driver arrives.
+          </p>
+        )}
+      {booking.fare.finalFarePoisha !== null && (
+        <p>
+          {booking.fare.discountBps === 2000
+            ? "20% sharing discount applied at arrival."
+            : "Solo fare fixed at arrival."}
+        </p>
+      )}
+      {booking.status === "REQUESTED" && (
+        <p>
+          Waiting for an online driver or a compatible pool with room for your
+          entire booking.
+        </p>
+      )}
+      {booking.pool && booking.status !== "CANCELLED" && (
+        <p>
+          {booking.pool.sharing
+            ? "Shared ride assigned. Your fare and booking details stay private."
+            : booking.pool.status === "ACCEPTED" ? "Your ride is assigned. Compatible passengers may join before arrival." : "Your ride is assigned; boarding is closed."}
+        </p>
+      )}
       {booking.status === "CANCELLED" && (
         <p>No charge. This booking was cancelled before arrival.</p>
       )}
@@ -124,6 +152,7 @@ export function BookingForm({
   const [estimate, setEstimate] = useState<{
     signature: string;
     poisha: number;
+    pooled: number;
   } | null>(null);
   const [previewError, setPreviewError] = useState(""),
     [previewing, setPreviewing] = useState(false);
@@ -153,12 +182,16 @@ export function BookingForm({
     setPreviewError("");
     const version = ++previewVersion.current;
     try {
-      const fare = await apiPost<{ soloMaximumPoisha: number }>(
-        "/fare-estimates",
-        { routeId, seats },
-      );
+      const fare = await apiPost<{
+        soloMaximumPoisha: number;
+        provisionalPooledPoisha: number;
+      }>("/fare-estimates", { routeId, seats });
       if (version === previewVersion.current)
-        setEstimate({ signature, poisha: fare.soloMaximumPoisha });
+        setEstimate({
+          signature,
+          poisha: fare.soloMaximumPoisha,
+          pooled: fare.provisionalPooledPoisha,
+        });
     } catch (error) {
       if (version === previewVersion.current) {
         setPreviewError(errorMessage(error));
@@ -199,8 +232,8 @@ export function BookingForm({
     <form className={styles.card} onSubmit={submit}>
       <h2>Request your ride</h2>
       <p>
-        One booking per trip for now. Shared pooling is coming later. Fares
-        become fixed when the driver arrives.
+        Compatible trips can share a vehicle. Fares become fixed when the driver
+        arrives.
       </p>
       <fieldset disabled={action.pending || previewing}>
         <label htmlFor="ride-route">Route</label>
@@ -242,8 +275,10 @@ export function BookingForm({
         </button>
         {estimate?.signature === signature && (
           <p role="status">
-            Solo estimate: <strong>{money(estimate.poisha)}</strong>. No pooling
-            discount applies.
+            Solo maximum: <strong>{money(estimate.poisha)}</strong>. Provisional
+            shared fare (20% off): <strong>{money(estimate.pooled)}</strong>.
+            The discount applies only if at least two separate bookings remain
+            at arrival.
           </p>
         )}
         <button
@@ -535,7 +570,7 @@ function History({ driver }: { driver: boolean }) {
             </>
           ) : (
             <p>
-              {item.vehicle.name} · {item.members.length} booking
+              {item.vehicle.name} · {item.members.length} bookings
             </p>
           )}
         </article>

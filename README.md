@@ -2,9 +2,9 @@
 
 Share a seat. Split the fare. Survive Dhaka traffic.
 
-A small ride-pooling MVP for RoBenDevs’ Software Engineer Internship assessment. Jashim drives Bullet, a three-seat vehicle; Nusrat, Rafiq, and Shirin request compatible trips. The eventual product must keep each passenger's fare private and never oversell Bullet.
+A small ride-pooling MVP for RoBenDevs’ Software Engineer Internship assessment. Jashim drives Bullet, a three-seat vehicle; Nusrat, Rafiq, and Shirin request compatible trips. The application keeps each passenger's fare private and prevents overselling Bullet.
 
-**Status: authentication and the complete single-booking ride lifecycle are implemented and verified.** Shared pooling is the next milestone. Submission deadline supplied by the candidate: **27 September 2026, 23:59 Bangladesh time**. Requirements source: [supplied PRD](Dhaka_Tesla_Pool_PRD_Internship.pdf), all five pages read.
+**Status: authentication, the complete ride lifecycle and shared pooling are implemented and verified.** Deployment and submission readiness are next. Submission deadline supplied by the candidate: **27 September 2026, 23:59 Bangladesh time**. Requirements source: [supplied PRD](Dhaka_Tesla_Pool_PRD_Internship.pdf), all five pages read.
 
 ## Implemented versus planned
 
@@ -12,9 +12,9 @@ Implemented: PostgreSQL-backed authentication (passenger registration, seeded pa
 
 Implemented UI: passenger registration, both-role login, session restoration, role-protected landing pages, logout, retryable failures and accessible responsive forms.
 
-Implemented rides: route/seat selection, solo fare previews, idempotent requests, driver availability/acceptance, arrival, start, drop-off, completion, valid cancellation, histories and five-second polling. One booking per pool can reserve multiple seats. Transactions and real PostgreSQL tests cover acceptance/cancellation races.
+Implemented rides: route/seat selection, solo fare previews, idempotent requests, driver availability/acceptance, arrival, start, drop-off, completion, valid cancellation, histories and five-second polling. Compatible bookings share available seats; each booking can reserve multiple seats. Arrival applies a 20% discount only when at least two distinct active bookings remain. Transactions and real PostgreSQL tests cover shared capacity, cross-instance last-seat competition and arrival/cancellation races.
 
-Planned: shared matching, additional bookings in a pool, pooling discounts and shared last-seat concurrency tests. The one-booking limit is temporary, with no permanent schema restriction.
+Planned: deployment and submission readiness. No further product milestone is started. The shared-pooling implementation preserves existing quote inputs and finalized fares without a schema change or database reset.
 
 Public deployment URL: **pending**. Demo video (maximum six minutes): **pending**. Authentication screenshots: [login](docs/images/auth-login-desktop.png), [passenger](docs/images/auth-passenger-desktop.png), [mobile registration](docs/images/auth-register-mobile.png). Foundation screenshots: [desktop](docs/images/foundation-desktop.png) / [mobile](docs/images/foundation-mobile.png).
 
@@ -76,7 +76,7 @@ git diff --check
 
 `test:db` requires the migrated, seeded local DB at DATABASE_URL. It repeats the seed twice and compares every table, checks demo hash formats/salts, and verifies constraints with fixtures rolled back in one PostgreSQL transaction. Use an isolated development database with no concurrent writers; do not run it on production. This is foundation validation, not proof of booking concurrency. Docker-only equivalent: `docker compose run --rm init npm run test:db`.
 
-See [progress and actual verification results](docs/progress.md). API contract tests use Vitest/Supertest. Later tests must cover the two exact fare examples, ownership, lifecycle, cancellation, idempotency, and competing claims for the last seat.
+See [progress and actual verification results](docs/progress.md). API contract tests use Vitest/Supertest. The current suites cover exact 40/48 BDT shared fares, ownership, lifecycle, cancellation, idempotency and independent-connection competing claims for the last seat. This checkpoint passed 56 backend tests, 24 frontend tests and all four browser journeys across the initial run and a corrected pooling-test rerun; see the progress record for details.
 
 ## Demo cast and environment
 
@@ -135,7 +135,7 @@ docs           Architecture, ERD, assumptions, API contract, verification
 compose.yaml   Frontend/API/init/PostgreSQL with named storage
 ```
 
-Controllers handle HTTP; later services enforce prices, ownership, state and seat allocation. Foreign keys, role constraints and partial active indexes defend database invariants. A bounded seat counter alone cannot ensure membership consistency: future mutations must lock and update membership/counter/history atomically.
+Controllers handle HTTP; services enforce prices, ownership, state and seat allocation. Foreign keys, role constraints and partial active indexes defend database invariants. A bounded seat counter alone cannot ensure membership consistency: ride mutations acquire the same transaction-scoped database advisory lock and update membership/counter/history atomically. This database-wide serialization limits throughput; fine-grained locking is a future improvement.
 
 ## Stack choices and realistic alternatives
 
@@ -159,9 +159,9 @@ Controllers handle HTTP; later services enforce prices, ownership, state and sea
 
 ## Workflow and limitations
 
-`feature/* → master → pre-release → release/v1.0.0`. Authentication, including the five verified formatting-only edits in 641615a, was fast-forwarded into master. Ride work is on `feature/ride-lifecycle` for review. No push/deployment, history reset, fabricated commits, or early release branches. Later branches are cut at integration/release stages.
+`feature/* → master → pre-release → release/v1.0.0`. Authentication, including the five verified formatting-only edits in 641615a, was fast-forwarded into master. The verified ride checkpoint 458ca30 was fast-forwarded into master. Shared pooling is on `feature/tesla-pooling` for review and has not been merged. No push/deployment, history reset, fabricated commits, or early release branches. Later branches are cut at integration/release stages.
 
-Driver cancellation/reassignment is out of MVP. No real routing, GPS, payments, chat, Redis, queues, or microservices. No public deployment has been attempted. Single-booking demo rides work; shared pooling remains pending. Seed upserts are individually idempotent; if a seed is interrupted, rerun to finish missing records.
+Driver cancellation/reassignment is out of MVP. No real routing, GPS, payments, chat, Redis, queues, or microservices. No public deployment has been attempted. Shared demo rides work. Ride mutations serialize database-wide, authentication rate limits are process-local, and the recorded tooling advisories still need release review. Seed upserts are individually idempotent; if a seed is interrupted, rerun to finish missing records.
 
 ## AI usage — observed record
 
@@ -178,7 +178,7 @@ Backend checkpoint AI record: Codex implemented the user-requested auth API, ses
 
 ## Frontend authentication verification
 
-See [the authentication guide](docs/authentication.md#frontend-authentication) for isolated browser tests and manual steps. Run `npm test -w @dtp/web` for the 22 focused UI tests (16 authentication and 6 rides); root `npm test` currently runs API tests only.
+See [the authentication guide](docs/authentication.md#frontend-authentication) for isolated browser tests and manual steps. Run `npm test -w @dtp/web` for the 24 focused UI tests (16 authentication and 8 rides); root `npm test` currently runs API tests only.
 
 The implementation keeps TypeScript at the boundaries: `src/api.ts` handles requests/errors, `src/auth/AuthContext.tsx` manages session state, `src/auth/AuthPages.tsx` contains forms and role guards, and `src/App.tsx` defines routes. The function bodies use familiar JavaScript/React patterns. Generated Prisma files are not tutorial entry points and should not be edited.
 
@@ -186,8 +186,12 @@ Frontend AI record: Codex implemented the requested forms/session integration an
 
 ## Demonstrate the ride lifecycle
 
-Follow the [exact two-window demonstration and test commands](docs/ride-lifecycle.md#manual-demonstration). Open http://localhost:8080/login in separate browser sessions for Nusrat and Jashim, then use /passenger and /driver. One seat from Banani to Mohakhali costs 50 BDT; fare becomes fixed at arrival. Histories are at /passenger/history and /driver/history.
+Follow the [exact separate-session shared-pooling demonstration and test commands](docs/ride-lifecycle.md#manual-demonstration). Open http://localhost:8080/login in separate browser sessions for Nusrat and Jashim, then use /passenger and /driver. Add Rafiq in another session on Banani?Gulshan 1 and Shirin on Banani?Mohakhali. Bullet holds three seats; an additional passenger waits. At arrival, their respective fares finalize at 40/48/40 BDT. Without another active booking, Nusrat pays the 50 BDT solo fare. Drop off each booking before completing the pool. Histories are at /passenger/history and /driver/history.
 
 Ride screenshots: [passenger desktop](docs/images/ride-passenger-desktop.png), [driver mobile](docs/images/ride-driver-mobile.png).
 
 Ride AI record: Codex inspected and normalized the five outstanding diffs before committing them separately, integrated authentication with preserved history, implemented the requested lifecycle and tests, and verified it in separate browser contexts. The coarse PostgreSQL advisory lock is an explicit implementation trade-off for this milestone, not a candidate-endorsed scalability claim. During verification, a recovered intent cleanup assertion was changed to await its React effect; the browser independently verified successful recovery after a lost booking response.
+
+Shared-pooling screenshots: [passenger desktop](docs/images/pooling-passenger-desktop.png), [driver mobile](docs/images/pooling-driver-mobile.png).
+
+Pooling AI record: Codex implemented matching/refill and arrival fare snapshots under the existing advisory lock, added independent-connection capacity tests, and verified separate-session browser journeys. A missing Playwright readiness fixture was corrected and the pooling journey rerun successfully. No candidate acceptance/rejection decisions are inferred.

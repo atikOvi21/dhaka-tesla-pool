@@ -18,7 +18,11 @@ export default defineConfig({
   projects: [
     {
       name: "desktop",
-      testMatch: ["auth.browser.spec.ts", "rides.browser.spec.ts"],
+      testMatch: [
+        "auth.browser.spec.ts",
+        "rides.browser.spec.ts",
+        "pooling.browser.spec.ts",
+      ],
       use: { viewport: { width: 1280, height: 900 } },
     },
     {

@@ -1,5 +1,5 @@
 import { AuthError } from "../auth/service.js";
-export const PRICING_VERSION = "demo-solo-v1";
+export const PRICING_VERSION = "demo-pool-v1";
 export const BASE_POISHA = 2000;
 export const RATE_POISHA = 1000;
 export function soloFare(
@@ -26,4 +26,11 @@ export function soloFare(
       "Fare exceeds the supported range.",
     );
   return Number(fare);
+}
+
+// Round half-up from the already-rounded solo quote.
+export function sharedFare(soloPoisha: number) {
+  if (!Number.isSafeInteger(soloPoisha) || soloPoisha < 0)
+    throw new AuthError(400, "VALIDATION_ERROR", "Invalid solo fare.");
+  return Number((BigInt(soloPoisha) * 8000n + 5000n) / 10000n);
 }

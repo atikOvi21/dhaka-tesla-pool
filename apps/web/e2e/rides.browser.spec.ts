@@ -41,7 +41,7 @@ test("Nusrat and Jashim complete a real trip, recover on refresh, and cancel a m
     await passenger.getByLabel("Route").selectOption({ label });
     await passenger.getByRole("button", { name: "Preview fare" }).click();
     await expect(
-      passenger.getByText("50.00 BDT", { exact: true }),
+      passenger.locator("form").getByText("50.00 BDT", { exact: true }),
     ).toBeVisible();
     // Let the server commit, then lose the response. Retrying must reuse the saved key.
     let firstKey = "";
@@ -130,11 +130,11 @@ test("Nusrat and Jashim complete a real trip, recover on refresh, and cancel a m
     ).toBeVisible({ timeout: 12000 });
     await passenger.getByRole("link", { name: "History", exact: true }).click();
     await expect(
-      passenger.getByRole("link", { name: "Completed", exact: true }),
+      passenger.getByRole("link", { name: "Completed", exact: true }).first(),
     ).toBeVisible();
     await driver.getByRole("link", { name: "History", exact: true }).click();
     await expect(
-      driver.getByRole("link", { name: "Completed", exact: true }),
+      driver.getByRole("link", { name: "Completed", exact: true }).first(),
     ).toBeVisible();
     await passenger.goto(bookingUrl);
     await expect(
@@ -147,7 +147,7 @@ test("Nusrat and Jashim complete a real trip, recover on refresh, and cancel a m
     await passenger.getByLabel("Seats").fill("2");
     await passenger.getByRole("button", { name: "Preview fare" }).click();
     await expect(
-      passenger.getByText("100.00 BDT", { exact: true }),
+      passenger.locator("form").getByText("100.00 BDT", { exact: true }),
     ).toBeVisible();
     await passenger
       .getByRole("button", { name: "Request ride", exact: true })

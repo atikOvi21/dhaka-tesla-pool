@@ -13,11 +13,11 @@ flowchart LR
 
 Development: Vite :5173 proxies /api to Express :3000. Compose: Nginx :8080 serves the built frontend and proxies /api to the internal API; PostgreSQL has a named volume. A one-shot init service runs versioned migrations and optional insert-only seed before API startup. API/frontend containers run as non-root users. No public API/DB ports in the default Compose path; a dev override exposes DB on loopback :5433.
 
-Controllers own validation/HTTP mapping; services own ride permissions, state and solo fares. Shared matching remains planned. PostgreSQL owns referential integrity, role relationships, active uniqueness, and row bounds. Native fetch is shared by the frontend. No SSR requirement makes a Vite SPA sufficient.
+Controllers own validation/HTTP mapping; services own ride permissions, shared matching, state and individual fares. PostgreSQL owns referential integrity, role relationships, active uniqueness, and row bounds. Native fetch is shared by the frontend. No SSR requirement makes a Vite SPA sufficient.
 
 ## Implemented transaction strategy
 
-The single-booking milestone uses a transaction-scoped PostgreSQL advisory lock shared by every ride mutation, before any business-state read. This deliberately serializes ride writes across API processes at demo scale; reads use repeatable-read snapshots. Booking creation, acceptance, cancellation, availability, arrival, start, drop-off and completion all follow this strategy. Existing partial unique indexes remain backstops. The real-PostgreSQL suite verifies competing acceptance, cancellation races, idempotency and rollback. See [ride lifecycle](ride-lifecycle.md).
+The shared-pooling milestone retains a transaction-scoped PostgreSQL advisory lock shared by every ride mutation, before any business-state read. This deliberately serializes ride writes across API processes at demo scale; reads use repeatable-read snapshots. Booking creation/matching, acceptance/waiting fill, cancellation/refill, availability, arrival, start, drop-off and completion all follow this strategy. Existing partial unique indexes remain backstops. The real-PostgreSQL suite verifies competing acceptance, cross-app last-seat claims, joining/cancellation races, idempotency and rollback. See [ride lifecycle](ride-lifecycle.md).
 
 ## Future fine-grained transaction plan
 
@@ -38,3 +38,7 @@ PostgreSQL-backed express-session/connect-pg-simple, opaque HttpOnly cookies, Se
 Foundation: health contract tests, TypeScript/build checks, real PostgreSQL migration/constraint/seed checks, Compose startup and browser connectivity. Later: authentication/privacy, state transitions, exact fare examples, cancellation/arrival races, idempotency, and concurrent last-seat claims. In-memory mocks cannot prove PostgreSQL locks work.
 
 At larger scale, first measure query latency/lock waits and add indexes; stateless API instances can share PostgreSQL sessions. Matching writes stay on the primary. Read replicas may serve stale history, not seat allocation. Geospatial search, event delivery, caching, and push updates require measured demand, not foundation dependencies.
+
+## Pooling trade-offs
+
+Matching uses configured pickup/group equality and whole-booking seat availability, not maps. The oldest eligible online ACCEPTED pool wins (created_at, id). Acceptance assigns the selected request first and fills remaining seats with oldest compatible requests that fit. A nonempty accepted pool refills after cancellation; an empty cancelled pool stays cancelled. A SQL conditional capacity increment and unique membership constraint backstop the common advisory-lock protocol. Every arrival snapshots one discount decision over active distinct bookings and applies it atomically to each stored solo quote. Arrival events retain the applied pricing policy for legacy-quote auditability. No new datastore, schema or second lock protocol was introduced.

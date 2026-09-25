@@ -1,4 +1,4 @@
-import { beforeAll, afterAll, describe, it, expect } from "vitest";
+import { beforeAll, beforeEach, afterAll, describe, it, expect } from "vitest";
 import request from "supertest";
 import { randomUUID } from "node:crypto";
 import { PrismaPg } from "@prisma/adapter-pg";
@@ -48,6 +48,32 @@ beforeAll(async () => {
   });
   app = createApp(async () => {}, auth, createRideRouter(db, auth));
 }, 20000);
+beforeEach(async () => {
+  const key = randomUUID();
+  const zones = await Promise.all(
+    [0, 1, 2].map((n) => db.zone.create({ data: { name: key + "-" + n } })),
+  );
+  routeId = (
+    await db.route.create({
+      data: {
+        pickup_zone_id: zones[0].id,
+        destination_zone_id: zones[1].id,
+        compatibility_group: key,
+        demo_distance_meters: 3000,
+      },
+    })
+  ).id;
+  secondRoute = (
+    await db.route.create({
+      data: {
+        pickup_zone_id: zones[0].id,
+        destination_zone_id: zones[2].id,
+        compatibility_group: key,
+        demo_distance_meters: 4000,
+      },
+    })
+  ).id;
+});
 afterAll(async () => {
   await auth.close();
   await db.$disconnect();
@@ -149,17 +175,32 @@ describe("single booking lifecycle on real PostgreSQL", () => {
   });
 
   it("rolls back fare, status and event writes if a later database write fails", async () => {
-    const {p,d,r}=await fixture(), pool=await service.accept(d.id,r.id);
-    const blocker=await db.rideEvent.create({data:{actor_id:d.id,request_id:r.id,pool_id:pool.id,event_type:"DRIVER_ARRIVED",operation_key:"DRIVER_ARRIVED:"+r.id}});
+    const { p, d, r } = await fixture(),
+      pool = await service.accept(d.id, r.id);
+    const blocker = await db.rideEvent.create({
+      data: {
+        actor_id: d.id,
+        request_id: r.id,
+        pool_id: pool.id,
+        event_type: "DRIVER_ARRIVED",
+        operation_key: "DRIVER_ARRIVED:" + r.id,
+      },
+    });
     try {
-      await expect(service.transition(d.id,pool.id,"arrive")).rejects.toThrow();
-      const booking=await service.booking(p.id,r.id);
+      await expect(
+        service.transition(d.id, pool.id, "arrive"),
+      ).rejects.toThrow();
+      const booking = await service.booking(p.id, r.id);
       expect(booking.status).toBe("MATCHED");
       expect(booking.fare.finalFarePoisha).toBeNull();
-      expect((await service.pool(d.id,pool.id)).status).toBe("ACCEPTED");
+      expect((await service.pool(d.id, pool.id)).status).toBe("ACCEPTED");
       await assertAllocation(pool.id);
-    } finally { await db.rideEvent.delete({where:{id:blocker.id}}); }
-    expect((await service.transition(d.id,pool.id,"arrive")).status).toBe("DRIVER_ARRIVED");
+    } finally {
+      await db.rideEvent.delete({ where: { id: blocker.id } });
+    }
+    expect((await service.transition(d.id, pool.id, "arrive")).status).toBe(
+      "DRIVER_ARRIVED",
+    );
   });
   it("rejects unsupported routes and seats without inserting requests", async () => {
     const p = await passenger();
@@ -239,9 +280,9 @@ describe("single booking lifecycle on real PostgreSQL", () => {
     if (winner.status === "fulfilled") await assertAllocation(winner.value.id);
   });
   it("allows one pool when a driver accepts two different requests concurrently", async () => {
-    const { d, r } = await fixture(),
+    const { d, r } = await fixture(2),
       p2 = await passenger();
-    const r2 = await service.create(p2.id, { routeId, seats: 1 }, randomUUID());
+    const r2 = await service.create(p2.id, { routeId, seats: 2 }, randomUUID());
     const results = await Promise.allSettled([
       service.accept(d.id, r.id),
       service.accept(d.id, r2.booking.id),

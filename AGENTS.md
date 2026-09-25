@@ -10,5 +10,5 @@
 - Use npm workspaces and commit package-lock.json. Check relevant version-specific docs; avoid unnecessary dependencies.
 - Run typecheck, tests, build, and relevant real-PostgreSQL checks. Record only checks actually executed.
 - Work on feature/* with logical type(scope): description commits; merge to master only after review. Later integrate pre-release and release/v1.0.0. No automatic publishing/deployment.
-- Authentication is merged into master through 641615a. The verified single-booking ride lifecycle is on feature/ride-lifecycle; see [ride lifecycle](docs/ride-lifecycle.md). Await review before merging rides. Shared pooling and last-seat concurrency are next; do not start them without instruction.
+- Authentication and the verified single-booking checkpoint through 458ca30 are merged into master. Shared pooling is verified on feature/tesla-pooling; see [ride lifecycle](docs/ride-lifecycle.md) and progress for evidence. Await review before merging pooling. Deployment and submission readiness are next; do not start them without instruction.
 - Update docs and truthful AI disclosure alongside changes; never invent candidate acceptance/rejection decisions.
