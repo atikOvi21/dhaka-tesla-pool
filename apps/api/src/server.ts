@@ -16,6 +16,7 @@ const app = createApp(
   },
   auth,
   createRideRouter(db, auth),
+  process.env.WEB_DIST_DIR,
 );
 const server = app.listen(env.PORT, "0.0.0.0", () => {
   console.info(JSON.stringify({ event: "api_started", port: env.PORT }));
