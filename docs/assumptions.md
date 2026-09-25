@@ -12,7 +12,7 @@ Sections 3–6 require passenger and driver flows, capacity-safe shared rides, i
 - Matching: same pickup zone AND same compatibility group, enough free seats, ACCEPTED pool, online driver. Banani → Mohakhali (3,000 m) and Banani → Gulshan 1 (4,000 m) share `banani-east-demo`. These are invented demo distances and compatibility, not real road routing. No pool fit leaves REQUESTED. Acceptance creates a pool and considers compatible waiting requests by created_at, id, skipping those that do not fit.
 - Joining after arrival is forbidden. Drop-offs release allocations without reopening matching. Drivers cannot go offline with an active pool. Driver cancellation/reassignment is outside MVP.
 - Cash only. Passenger cancellation only in REQUESTED/MATCHED; no charge. Arrival freezes fares. Separate drop-offs are supported; pool completion requires every non-cancelled booking completed.
-- Poll active screens approximately every 5 seconds. Authentication context only; native fetch wrapper; CSS Modules. Free hosting provider remains undecided.
+- Poll active screens approximately every 5 seconds. Authentication context only; native fetch wrapper; CSS Modules. Render Free + Neon Free are prepared for assessment hosting; no live deployment is claimed.
 
 ## Lifecycle
 
@@ -42,8 +42,8 @@ Snapshot seats, distance, base, rate, pricing version, solo/estimate at request 
 - API health is public and discloses only status. Readiness checks PostgreSQL plus the migrated users table, with bounded query/connection timeouts. No business endpoint stubs returning fabricated success.
 - Demo seed is opt-in with SEED_DEMO=true; Compose enables it for this local assessment setup. Insert-only upserts preserve passwords, vehicle changes, requests, and history on reruns.
 
-No substantive conflict found between the PRD and the supplied plan. Deadline comes from the candidate's request, not the PDF. Public deployment, screenshots of product flows, video, complete business tests, and AI accepted/rejected examples remain later deliverables.
+No substantive conflict found between the PRD and the supplied plan. Deadline comes from the candidate's request, not the PDF. Product screenshots and business/concurrency tests are complete. Public deployment verification, the video, and specific personal AI-example reasons remain submission items.
 
 ## Shared-pooling milestone
 
-The temporary one-booking application limit is removed. Oldest compatible eligible pools accept whole bookings; acceptance/refill scan waiting requests in stable creation order. All writers retain the same database advisory lock. Existing unfinalized quotes retain stored inputs and become eligible for the current sharing policy from their stored solo maximum; arrival metadata records the applied version. Finalized/completed fares are unchanged. See ride-lifecycle.md for precise compatibility and legacy-response semantics. Deployment/submission readiness is next.
+The temporary one-booking application limit is removed. Oldest compatible eligible pools accept whole bookings; acceptance/refill scan waiting requests in stable creation order. All writers retain the same database advisory lock. Existing unfinalized quotes retain stored inputs and become eligible for the current sharing policy from their stored solo maximum; arrival metadata records the applied version. Finalized/completed fares are unchanged. See ride-lifecycle.md for precise compatibility and legacy-response semantics. Integration and release preparation are tracked in progress.md.
