@@ -177,7 +177,7 @@ describe("authentication UI", () => {
     });
   });
 
-  it.each(["network", "credentials", "csrf"])(
+  it.each(["network", "server", "credentials", "csrf", "rate", "busy"])(
     "preserves email, clears password, and never replays a failed %s mutation",
     async (kind) => {
       let posts = 0;
@@ -188,6 +188,9 @@ describe("authentication UI", () => {
           if (path.endsWith("/csrf")) return ok({ csrfToken: "csrf" });
           posts++;
           if (kind === "network") throw new TypeError("offline");
+          if (kind === "server") return fail(500, "INTERNAL_ERROR", "Unavailable.");
+          if (kind === "rate") return fail(429, "RATE_LIMITED", "Too many requests.");
+          if (kind === "busy") return fail(503, "AUTH_BUSY", "Please try again shortly.");
           return kind === "csrf"
             ? fail(403, "CSRF_INVALID", "Invalid token.")
             : fail(401, "INVALID_CREDENTIALS", "Invalid email or password.");
@@ -200,15 +203,51 @@ describe("authentication UI", () => {
       expect(screen.getByLabelText("Email")).toHaveValue(passenger.email);
       expect(screen.getByLabelText("Password")).toHaveValue("");
       expect(posts).toBe(1);
-      // Checking the session is a GET recovery, and keeps the draft on 401.
-      await user.click(screen.getByRole("button", { name: "Check session" }));
-      await waitFor(() =>
-        expect(screen.getByRole("button", { name: "Sign in" })).toBeVisible(),
-      );
+      expect(screen.queryByText("No request has been automatically resubmitted.")).toBeNull();
+      if (kind === "network" || kind === "server") {
+        expect(screen.getByRole("alert")).toHaveTextContent("We couldn't confirm whether you signed in.");
+        await user.click(screen.getByRole("button", { name: "Check sign-in status" }));
+        await waitFor(() => expect(screen.getByRole("button", { name: "Sign in" })).toBeVisible());
+      } else {
+        expect(screen.queryByRole("button", { name: "Check sign-in status" })).toBeNull();
+        if (kind === "credentials") expect(screen.getByRole("alert")).toHaveTextContent("Incorrect email or password.");
+        if (kind === "rate") expect(screen.getByRole("alert")).toHaveTextContent("Please wait before trying again.");
+      }
       expect(screen.getByLabelText("Email")).toHaveValue(passenger.email);
       expect(posts).toBe(1);
     },
   );
+
+
+  it.each(["duplicate", "network"])("handles registration %s with the appropriate next step", async (kind) => {
+    let posts = 0;
+    vi.stubGlobal("fetch", vi.fn(async (path: string) => {
+      if (path.endsWith("/me")) return anonymous();
+      if (path.endsWith("/csrf")) return ok({ csrfToken: "csrf" });
+      posts++;
+      if (kind === "network") throw new TypeError("offline");
+      return fail(409, "EMAIL_UNAVAILABLE", "Email unavailable.");
+    }));
+    mount("/register");
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText("Name"), "Nusrat");
+    await user.type(screen.getByLabelText("Email"), passenger.email);
+    await user.type(screen.getByLabelText("Password"), "DemoOnly!Dhaka2026");
+    await user.click(screen.getByRole("button", { name: "Create account" }));
+    expect(await screen.findByRole("alert")).toBeVisible();
+    expect(screen.getByLabelText("Password")).toHaveValue("");
+    if (kind === "duplicate") {
+      expect(screen.getByRole("link", { name: "Sign in to your existing account" })).toHaveAttribute("href", "/login");
+      expect(screen.queryByRole("button", { name: "Check sign-in status" })).toBeNull();
+    } else {
+      expect(screen.getByRole("alert")).toHaveTextContent("We couldn't confirm whether your account was created.");
+      await user.click(screen.getByRole("button", { name: "Check sign-in status" }));
+      await screen.findByRole("button", { name: "Create account" });
+    }
+    expect(screen.getByLabelText("Name")).toHaveValue("Nusrat");
+    expect(screen.getByLabelText("Email")).toHaveValue(passenger.email);
+    expect(posts).toBe(1);
+  });
 
   it("prevents duplicate submissions while a request is pending", async () => {
     let finish!: (response: Response) => void;
