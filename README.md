@@ -18,7 +18,7 @@ Release preparation: normal pooling merge into master, pre-release verification,
 
 **Public deployment URL: PENDING - no live deployment verified.** [Free deployment procedure](docs/deployment.md)
 
-**DEMO VIDEO URL: PENDING - candidate must add the real maximum-six-minute video link before submission.** [Timed outline and submission checklist](docs/demo-and-submission.md)
+**Video Link:** [Open Google Drive folder](https://drive.google.com/drive/folders/1EYClYW4iLF_SQltxZ1SqtcQ9-hLmzDPx?usp=sharing) - Video upload pending. [Timed outline and submission checklist](docs/demo-and-submission.md)
 
 Repository: https://github.com/atikOvi21/dhaka-tesla-pool (public access verified without authentication). Authentication screenshots: [login](docs/images/auth-login-desktop.png), [passenger](docs/images/auth-passenger-desktop.png), [mobile registration](docs/images/auth-register-mobile.png). Foundation screenshots: [desktop](docs/images/foundation-desktop.png) / [mobile](docs/images/foundation-mobile.png).
 
