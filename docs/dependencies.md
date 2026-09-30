@@ -35,3 +35,7 @@ Added development-only Vitest/jsdom, React Testing Library/user-event/jest-dom a
 ## Ride lifecycle checkpoint
 
 No new dependencies. Existing Prisma/pg transactions, Zod, native fetch, React/Router and Playwright provide the lifecycle. Full Docker install retained four high tooling advisories; the API runtime prune audited 142 packages with zero vulnerabilities. PostgreSQL tests emitted a pg deprecation warning about concurrent query calls scheduled by the installed stack; pg8 remains installed and all tests passed. No claim is made about compatibility with a future pg9 upgrade.
+
+## Release preparation
+
+No dependency versions changed. The Render native start path retains dev tooling so it can run migrations before startup on the Free plan; the Compose runtime pruning result must not be attributed to that full hosted install. The four previously recorded high tooling advisory entries remain disclosed. Same-origin static serving uses existing Express, with focused route/error-boundary tests. No major dependency upgrade is needed to ship the verified local MVP.

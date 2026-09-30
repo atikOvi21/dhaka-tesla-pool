@@ -4,7 +4,7 @@ Share a seat. Split the fare. Survive Dhaka traffic.
 
 A small ride-pooling MVP for RoBenDevs’ Software Engineer Internship assessment. Jashim drives Bullet, a three-seat vehicle; Nusrat, Rafiq, and Shirin request compatible trips. The application keeps each passenger's fare private and prevents overselling Bullet.
 
-**Status: authentication, the complete ride lifecycle and shared pooling are implemented and verified.** Deployment and submission readiness are next. Submission deadline supplied by the candidate: **27 September 2026, 23:59 Bangladesh time**. Requirements source: [supplied PRD](Dhaka_Tesla_Pool_PRD_Internship.pdf), all five pages read.
+**Status: authentication, the complete ride lifecycle and shared pooling are implemented and verified.** Integration and release preparation are complete; public deployment and the candidate video remain pending. Submission deadline supplied by the candidate: **27 September 2026, 23:59 Bangladesh time**. Requirements source: [supplied PRD](Dhaka_Tesla_Pool_PRD_Internship.pdf), all five pages read.
 
 ## Implemented versus planned
 
@@ -14,9 +14,13 @@ Implemented UI: passenger registration, both-role login, session restoration, ro
 
 Implemented rides: route/seat selection, solo fare previews, idempotent requests, driver availability/acceptance, arrival, start, drop-off, completion, valid cancellation, histories and five-second polling. Compatible bookings share available seats; each booking can reserve multiple seats. Arrival applies a 20% discount only when at least two distinct active bookings remain. Transactions and real PostgreSQL tests cover shared capacity, cross-instance last-seat competition and arrival/cancellation races.
 
-Planned: deployment and submission readiness. No further product milestone is started. The shared-pooling implementation preserves existing quote inputs and finalized fares without a schema change or database reset.
+Release preparation: normal pooling merge into master, pre-release verification, and release/v1.0.0 handoff. Free hosting configuration is prepared; account setup, public verification and the video remain candidate actions. The shared-pooling implementation preserves existing quote inputs and finalized fares without a schema change or database reset.
 
-Public deployment URL: **pending**. Demo video (maximum six minutes): **pending**. Authentication screenshots: [login](docs/images/auth-login-desktop.png), [passenger](docs/images/auth-passenger-desktop.png), [mobile registration](docs/images/auth-register-mobile.png). Foundation screenshots: [desktop](docs/images/foundation-desktop.png) / [mobile](docs/images/foundation-mobile.png).
+**Public deployment URL: PENDING - no live deployment verified.** [Free deployment procedure](docs/deployment.md)
+
+**DEMO VIDEO URL: PENDING - candidate must add the real maximum-six-minute video link before submission.** [Timed outline and submission checklist](docs/demo-and-submission.md)
+
+Repository: https://github.com/atikOvi21/dhaka-tesla-pool (public access verified without authentication). Authentication screenshots: [login](docs/images/auth-login-desktop.png), [passenger](docs/images/auth-passenger-desktop.png), [mobile registration](docs/images/auth-register-mobile.png). Foundation screenshots: [desktop](docs/images/foundation-desktop.png) / [mobile](docs/images/foundation-mobile.png).
 
 ## Quick start — Docker
 
@@ -61,22 +65,34 @@ npm run dev:api
 
 In another terminal: `npm run dev:web`. Open **http://localhost:5173**; Vite proxies `/api` to localhost:3000. The optional dev Compose file exposes PostgreSQL only at 127.0.0.1:5433. Use the same two `-f` options when stopping that development DB. Stop a full Compose stack before switching modes. No CORS configuration is needed.
 
-## Verification
+## Tests
+
+After the local environment setup and dependency installation above:
 
 ```powershell
 npm run db:generate
 npm run typecheck
-npm test
 npm run build
-npm run db:migrate
-npm run db:seed
-npm run test:db
+docker compose -f compose.auth-test.yaml up -d --wait db
+npm run test:auth -w @dtp/api
+npm run test:rides -w @dtp/api
+npm test -w @dtp/api
+npm test -w @dtp/web
+node scripts/verify-hosted.mjs
+docker compose build --pull=false
+docker compose -f compose.e2e.yaml up --no-build -d --wait
+docker compose -f compose.e2e.yaml run --rm --no-deps init npm run test:db
+npm run test:e2e -w @dtp/web -- pooling.browser.spec.ts --project=desktop
+docker compose -f compose.e2e.yaml down
+docker compose -f compose.auth-test.yaml down
 git diff --check
 ```
 
-`test:db` requires the migrated, seeded local DB at DATABASE_URL. It repeats the seed twice and compares every table, checks demo hash formats/salts, and verifies constraints with fixtures rolled back in one PostgreSQL transaction. Use an isolated development database with no concurrent writers; do not run it on production. This is foundation validation, not proof of booking concurrency. Docker-only equivalent: `docker compose run --rm init npm run test:db`.
+Browser tests use installed Edge on Windows; on other platforms install Playwright Chromium with npm exec -w @dtp/web -- playwright install chromium. See [browser setup](docs/authentication.md#frontend-authentication). Root npm test runs the shared API suite only, not every test.
 
-See [progress and actual verification results](docs/progress.md). API contract tests use Vitest/Supertest. The current suites cover exact 40/48 BDT shared fares, ownership, lifecycle, cancellation, idempotency and independent-connection competing claims for the last seat. This checkpoint passed 56 backend tests, 24 frontend tests and all four browser journeys across the initial run and a corrected pooling-test rerun; see the progress record for details.
+Release checkpoint: **32 PostgreSQL ride/pooling + 19 PostgreSQL auth + 7 API/hosted-route tests, 24 frontend tests, 17 database/seed checks, and one real shared-pooling browser journey passed**. Typechecks, builds, fresh disposable Compose startup and the hosted session smoke passed. The latter uses a simulated trusted TLS proxy, not a live cloud endpoint. See [actual results, corrections and limits](docs/progress.md).
+
+The capacity test uses two Express instances, independent PostgreSQL connections and concurrent HTTP requests competing for the last seat; three repetitions each assign exactly one passenger. Real tests also verify rollback, idempotency, cancellation/arrival ordering, ownership and exact fare snapshots. The browser demonstrates separate sessions, three seats/full waiting, independent fares/drop-offs and pre-arrival cancellation. Disposable stacks preserve the development database. The foundation checker repeats the seed and compares tables; it is not the concurrency proof.
 
 ## Demo cast and environment
 
@@ -137,6 +153,50 @@ compose.yaml   Frontend/API/init/PostgreSQL with named storage
 
 Controllers handle HTTP; services enforce prices, ownership, state and seat allocation. Foreign keys, role constraints and partial active indexes defend database invariants. A bounded seat counter alone cannot ensure membership consistency: ride mutations acquire the same transaction-scoped database advisory lock and update membership/counter/history atomically. This database-wide serialization limits throughput; fine-grained locking is a future improvement.
 
+## Matching and fare calculations
+
+A whole booking joins the oldest eligible pool (created_at, then ID): same pickup zone and route compatibility group, pool ACCEPTED, driver online, enough remaining seats. No fit means REQUESTED. Driver acceptance takes the selected request first, then oldest compatible waiting requests that fit. Pre-arrival cancellation refills a nonempty pool; cancellation of the last member cancels that trip. No joining after arrival.
+
+Money is integer poisha (100 = 1 BDT), distance integer meters. Solo fare is seats * (2000 + distanceMeters * 1000 / 1000), rounded half-up once to poisha using BigInt. At arrival, two or more distinct active bookings qualify for 20% off the stored solo maximum: floor((soloPoisha * 8000 + 5000) / 10000). A single two-seat booking does not qualify. Nusrat's 3000 m costs 5000 solo / 4000 shared; Rafiq's 4000 m costs 6000 / 4800. Before arrival this is conditional; after arrival it is frozen. Original quotes and completed fares are preserved across pricing-policy changes. [Exact lifecycle and rounding](docs/ride-lifecycle.md)
+
+## API overview
+
+Base /api/v1; success { data }, errors { error: { code, message } }. PostgreSQL session cookies identify users; all mutations require a session-bound X-CSRF-Token, including login/registration. GET /auth/csrf bootstraps it. Booking creation also requires Idempotency-Key.
+
+- Auth: /auth/register, /auth/login, /auth/me, /auth/logout.
+- Reference and estimate: /zones, /routes, /fare-estimates.
+- Passenger: /ride-requests, /ride-requests/active, own detail and cancellation.
+- Driver: /driver/profile, /driver/availability, waiting requests/acceptance, pools/arrival/start/individual drop-off/completion.
+- Health: /health/live and /health/ready.
+
+[Methods, payloads, permissions, pagination and error codes](docs/api-contract.md). Passenger responses never include another passenger's fare/private booking; driver views expose names/routes/seats/statuses without emails/fares.
+
+## Database diagram
+
+```mermaid
+erDiagram
+  users ||--o| driver_profiles : has
+  users ||--o| vehicles : owns
+  users ||--o{ ride_requests : requests
+  users ||--o{ ride_events : acts
+  zones ||--o{ routes : pickup
+  zones ||--o{ routes : destination
+  zones ||--o{ pools : pickup_snapshot
+  routes ||--o{ ride_requests : follows
+  vehicles ||--o{ pools : serves
+  pools ||--o{ pool_memberships : contains
+  ride_requests ||--o| pool_memberships : assigned_once
+  pools |o--o{ ride_events : history
+  ride_requests |o--o{ ride_events : history
+  sessions {
+    string sid PK
+    json sess
+    timestamp expire
+  }
+```
+
+[Full ERD, ten-table rationale, indexes and constraints](docs/erd.md). Database constraints backstop the service's atomic membership/counter/event updates; they do not replace the common transaction lock.
+
 ## Stack choices and realistic alternatives
 
 | Choice | Why it fits; alternative; when to switch |
@@ -153,25 +213,25 @@ Controllers handle HTTP; services enforce prices, ownership, state and seat allo
 | React state/auth context + fetch | Small UI needs no global cache library; TanStack Query if cache invalidation/loading complexity grows. |
 | 5-second ride polling | Easy failure/reconnect behavior; SSE/WebSockets if measured freshness or polling load demands it. |
 | Vitest + Supertest + real PostgreSQL | Fast HTTP tests plus actual DB semantics; Playwright verifies authentication and separate-session passenger/driver journeys against real PostgreSQL. |
-| Docker Compose | Reproducible assessment deployment; managed hosting later for operations. Only free/free-tier providers; provider decision pending. |
+| Docker Compose | Reproducible assessment deployment; managed hosting later for operations. Render Free + Neon Free prepared for assessment hosting; an existing free VM running Compose is an alternative. Switch only when measured availability/traffic requires managed capacity outside this no-payment assessment. |
 
 [Dependency notes and version-specific references](docs/dependencies.md) record observed advisories and documentation consulted.
 
 ## Workflow and limitations
 
-`feature/* → master → pre-release → release/v1.0.0`. Authentication, including the five verified formatting-only edits in 641615a, was fast-forwarded into master. The verified ride checkpoint 458ca30 was fast-forwarded into master. Shared pooling is on `feature/tesla-pooling` for review and has not been merged. No push/deployment, history reset, fabricated commits, or early release branches. Later branches are cut at integration/release stages.
+`feature/* → master → pre-release → release/v1.0.0`. Authentication, including the five verified formatting-only edits in 641615a, was fast-forwarded into master. The verified ride checkpoint 458ca30 was fast-forwarded into master. Pooling was integrated with normal merge e58f479, preserving feature commits. Integration/deployment preparation is on pre-release; release/v1.0.0 is cut from the verified checkpoint. The three long-lived branches are pushed to the existing origin without rewriting remote history; see progress for actual results. No public deployment or video publication is claimed.
 
 Driver cancellation/reassignment is out of MVP. No real routing, GPS, payments, chat, Redis, queues, or microservices. No public deployment has been attempted. Shared demo rides work. Ride mutations serialize database-wide, authentication rate limits are process-local, and the recorded tooling advisories still need release review. Seed upserts are individually idempotent; if a seed is interrupted, rerun to finish missing records.
 
-## AI usage — observed record
+## AI Usage
 
 OpenAI Codex read the supplied PRD, inspected the environment, authored this foundation and documentation, consulted dependency documentation, and ran the recorded checks. A temporary Node PDF reader was used because Python/Poppler were unavailable. The candidate supplied the stack and detailed product decisions before this session; do not present them as newly accepted AI suggestions.
 
-- Accepted suggestion example: **pending candidate review**; no explicit acceptance observed.
-- Rejected/changed suggestion example: **pending candidate input**; no explicit rejection observed.
+- Accepted, reported by the candidate on 25 September: AI assistance for typical request/accept ride implementation. **Candidate reason still needed**; do not infer it from passing tests.
+- Changed/rejected, reported by the candidate: they did not choose all AI-proposed UI designs. **Specific UI example and reason still needed.** The candidate also reports thoroughly reviewing Git commits and stack choices.
 - Observed implementation correction: Prisma validation required composite uniqueness for role-bearing one-to-one relations; Codex added it and reran checks. This is a technical correction, not an invented candidate rejection.
 
-The candidate must review and be able to explain every shipped part. Before final submission, replace the pending disclosure examples with real decisions from the collaboration.
+The candidate must review and be able to explain every shipped part. Before final submission, complete the personal reasons and specific changed UI example. Codex asked the candidate directly; missing detail is left explicit rather than invented.
 
 
 Backend checkpoint AI record: Codex implemented the user-requested auth API, session/CSRF protection, isolated PostgreSQL tests and runtime restart check. The candidate explicitly narrowed this checkpoint to backend work and deferred frontend/browser testing. A test assertion was corrected after inspecting connect-pg-simple's whole-second expiry rounding; exact application expiry remains independently checked. This is an observed engineering correction, not a fabricated accepted/rejected suggestion.
@@ -186,7 +246,7 @@ Frontend AI record: Codex implemented the requested forms/session integration an
 
 ## Demonstrate the ride lifecycle
 
-Follow the [exact separate-session shared-pooling demonstration and test commands](docs/ride-lifecycle.md#manual-demonstration). Open http://localhost:8080/login in separate browser sessions for Nusrat and Jashim, then use /passenger and /driver. Add Rafiq in another session on Banani?Gulshan 1 and Shirin on Banani?Mohakhali. Bullet holds three seats; an additional passenger waits. At arrival, their respective fares finalize at 40/48/40 BDT. Without another active booking, Nusrat pays the 50 BDT solo fare. Drop off each booking before completing the pool. Histories are at /passenger/history and /driver/history.
+Follow the [exact separate-session shared-pooling demonstration and test commands](docs/ride-lifecycle.md#manual-demonstration). Open http://localhost:8080/login in separate browser sessions for Nusrat and Jashim, then use /passenger and /driver. Add Rafiq in another session on Banani-Gulshan 1 and Shirin on Banani-Mohakhali. Bullet holds three seats; an additional passenger waits. At arrival, their respective fares finalize at 40/48/40 BDT. Without another active booking, Nusrat pays the 50 BDT solo fare. Drop off each booking before completing the pool. Histories are at /passenger/history and /driver/history.
 
 Ride screenshots: [passenger desktop](docs/images/ride-passenger-desktop.png), [driver mobile](docs/images/ride-driver-mobile.png).
 

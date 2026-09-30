@@ -1,0 +1,31 @@
+# Review the Free plan before creation. No database or paid resource is provisioned here.
+services:
+  - type: web
+    name: dhaka-tesla-pool
+    runtime: node
+    plan: free
+    region: singapore
+    branch: release/v1.0.0
+    autoDeployTrigger: off
+    buildCommand: npm ci --include=dev && npm run db:generate && npm run build
+    startCommand: node scripts/start-hosted.mjs
+    healthCheckPath: /api/v1/health/ready
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: NODE_ENV
+        value: production
+      - key: WEB_DIST_DIR
+        value: apps/web/dist
+      - key: DATABASE_URL
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: AUTH_ORIGINS
+        sync: false
+      - key: SESSION_COOKIE_SECURE
+        value: "true"
+      - key: TRUST_PROXY_HOPS
+        value: "1"
+      - key: SEED_DEMO
+        value: "true"

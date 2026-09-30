@@ -35,10 +35,14 @@ PostgreSQL-backed express-session/connect-pg-simple, opaque HttpOnly cookies, Se
 
 ## Verification layers
 
-Foundation: health contract tests, TypeScript/build checks, real PostgreSQL migration/constraint/seed checks, Compose startup and browser connectivity. Later: authentication/privacy, state transitions, exact fare examples, cancellation/arrival races, idempotency, and concurrent last-seat claims. In-memory mocks cannot prove PostgreSQL locks work.
+Foundation: health contract tests, TypeScript/build checks, real PostgreSQL migration/constraint/seed checks, Compose startup and browser connectivity. Implemented: authentication/privacy, state transitions, exact fare examples, cancellation/arrival races, idempotency, and concurrent last-seat claims. In-memory mocks cannot prove PostgreSQL locks work.
 
 At larger scale, first measure query latency/lock waits and add indexes; stateless API instances can share PostgreSQL sessions. Matching writes stay on the primary. Read replicas may serve stale history, not seat allocation. Geospatial search, event delivery, caching, and push updates require measured demand, not foundation dependencies.
 
 ## Pooling trade-offs
 
 Matching uses configured pickup/group equality and whole-booking seat availability, not maps. The oldest eligible online ACCEPTED pool wins (created_at, id). Acceptance assigns the selected request first and fills remaining seats with oldest compatible requests that fit. A nonempty accepted pool refills after cancellation; an empty cancelled pool stays cancelled. A SQL conditional capacity increment and unique membership constraint backstop the common advisory-lock protocol. Every arrival snapshots one discount decision over active distinct bookings and applies it atomically to each stored solo quote. Arrival events retain the applied pricing policy for legacy-quote auditability. No new datastore, schema or second lock protocol was introduced.
+
+## Hosted assessment variant
+
+Render Free terminates HTTPS and forwards directly to the same Express API, which optionally serves the built React files from WEB_DIST_DIR. Neon Free supplies PostgreSQL. Auth/CSRF, business services and the schema are unchanged; local Compose still uses Nginx. Startup applies migrations and optional insert-only seed, then serves traffic. The single hosted process retains migration tooling (and its documented advisories); the Compose runtime stays pruned. See [deployment procedure and unverified public gates](deployment.md).

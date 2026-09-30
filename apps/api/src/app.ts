@@ -1,4 +1,6 @@
 import express, { type ErrorRequestHandler, type Router } from "express";
+import { accessSync } from "node:fs";
+import { resolve } from "node:path";
 import type { AuthRuntime } from "./auth/index.js";
 import { AuthError } from "./auth/service.js";
 import { PasswordBusyError } from "./password.js";
@@ -7,6 +9,7 @@ export function createApp(
   checkDatabase: () => Promise<void>,
   auth?: AuthRuntime,
   rides?: Router,
+  webDist?: string,
 ) {
   const app = express();
   app.disable("x-powered-by");
@@ -42,6 +45,19 @@ export function createApp(
     );
     app.use("/api/v1/auth", auth.router);
     if (rides) app.use("/api/v1", rides);
+  }
+  if (webDist) {
+    const directory = resolve(webDist);
+    const index = resolve(directory, "index.html");
+    accessSync(index); // Fail startup if the hosted build is missing.
+    // Unknown API paths must stay JSON errors, never receive the SPA fallback.
+    app.use("/api", (_req, res) => {
+      res.status(404).json({ error: { code: "NOT_FOUND", message: "Resource not found." } });
+    });
+    app.use(express.static(directory, { index: false, redirect: false, dotfiles: "ignore" }));
+    app.get(["/", "/login", "/register", "/foundation", "/passenger", "/passenger/{*path}", "/driver", "/driver/{*path}"], (_req, res) => {
+      res.set("Cache-Control", "no-store").sendFile(index);
+    });
   }
   app.use((_req, res) =>
     res

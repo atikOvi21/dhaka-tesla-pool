@@ -1,6 +1,48 @@
 # Progress
 
-## Current checkpoint - shared pooling verified
+## Current checkpoint - integration and release gate passed
+
+Verified 25 September 2026. Deadline: 27 September, 23:59 Bangladesh time. This record is authored on **pre-release**; the approved final operation is to cut **release/v1.0.0** from this checkpoint and push master/pre-release/release to the existing origin, checking remote IDs afterward. See the final Git graph for the documentation commit and publication result. No public deployment, video publication or application submission is claimed.
+
+### Independent review and Git integration
+
+Read all five supplied PRD pages, AGENTS, architecture/ERD/assumptions/API/progress, schema, actual ride matching/fare/transition code, real concurrency assertions and the browser journey. The starting feature/tesla-pooling tree was clean and matched origin. Foundation, auth and ride-lifecycle branches were already ancestors of master (all merge-base checks succeeded); no duplicate merges were made. No core-product blocker was found. Re-ran the focused gates instead of treating the latest documentation commit as proof.
+
+**e58f479 - chore(integration): merge verified shared pooling into master** is a normal two-parent --no-ff merge, preserving pooling commits 71494d4, 0c8ebb6 and 7c33e1a. Created pre-release from that integrated master. No rebase, squash, force, reset, discarded work or fabricated history.
+
+### Necessary release preparation
+
+**7500cd1 - build(deploy): prepare free same-origin hosting and startup checks** adds optional Express serving of the built React application. Known frontend deep links receive the SPA; API authentication/error boundaries and missing asset errors are preserved. WEB_DIST_DIR is opt-in; ordinary Compose still uses Nginx. The hosting entrypoint runs migrations and optional insert-only seed before starting the server, failing startup if they fail. No auth/ride rules or dependency versions changed.
+
+render.yaml explicitly selects Render Free, a single Node24 service, no automatic deploy, secure cookies and an exact HTTPS origin. Neon Free direct PostgreSQL is the prepared database option. Account/quota availability and actual public HTTPS behavior remain unverified. Native hosting retains migration tools and their recorded advisories; it does not inherit the pruned Compose runtime's audit result. See deployment.md for steps, limitations and the mandatory public acceptance gate.
+
+README now includes matching, hand-checkable poisha fares, architecture plus ERD, API overview, exact test commands, deployment instructions and prominent real-video/live-URL placeholders. demo-and-submission.md follows the PRD's 0-1 / 1-3 / 3-6 minute structure and includes a candidate checklist. The candidate reports accepting AI help for request/accept implementation, changing some proposed UI designs, and reviewing stack/commits; a specific UI example and personal reasons were requested, not invented.
+
+### Checks actually run at this release gate
+
+- **32 PostgreSQL ride/pooling tests passed**, including the independent-app/connection last-seat race (three repetitions), 40/48 fares, whole-seat capacity, cancellation/refill, arrival races, immutable fares, individual drop-offs, rollback, replay and privacy/ownership.
+- **19 PostgreSQL authentication tests passed**, including session regeneration/expiry, CSRF, role enforcement and secure proxy/cookie configuration. Fresh :5434 database migrated and seeded; repeat runner found no pending migrations and preserved the seed.
+- **24 frontend tests passed**. Root typecheck passed before and after the hosting addition. Root build passed for API and frontend.
+- **5 original shared API tests passed** before the hosting edit; the expanded **7 API/hosted-route tests passed** afterward. Current focused backend total: 58 (32 + 19 + 7); the earlier five are not counted twice.
+- **docker compose build --pull=false passed** with existing dependency/base-image cache reused. API source was rebuilt; this was not a no-cache dependency reinstall. Runtime prune audited 142 packages with zero vulnerabilities; no fresh full dependency or OS clean-audit claim.
+- **Fresh-style disposable Compose startup passed** using compose.e2e.yaml and a newly created tmpfs PostgreSQL database. Init applied 202609230001_foundation and insert-only demo seed; DB/API/web healthy. The existing :8080 development database/records were not reset or mutated by tests.
+- **17 database/seed checks passed** inside that fresh stack, including seed repeatability and rollback-only constraint fixtures.
+- **One real pooling browser journey passed on the first release-gate invocation** (30.8 seconds total; test 28.7 seconds). Separate cookie contexts showed Jashim online, Nusrat accepted, Rafiq joining the same pool, Shirin in seat three and an extra passenger waiting. Arrival showed 40/48/40 BDT; start, independent drop-offs, guarded completion, histories, refresh, mobile capacity view and pre-arrival cancellation to Nusrat's 50 BDT solo fare passed. No browser page errors. Existing authentication/solo browser journeys were not rerun at this checkpoint; their earlier evidence remains historical.
+- **node scripts/verify-hosted.mjs passed** after correcting a test assumption: /api/v1/missing receives 401 at the existing unauthenticated ride-router boundary, so the explicit 404 assertion targets /api/missing. The initial failed harness also emitted a Windows Node process-cleanup assertion; cleanup now awaits child close and the rerun exited successfully. No application authorization was weakened. The check exercises hosted migrations/seed, SPA deep links, Secure/HttpOnly cookie rotation, session read, wrong-origin rejection and logout using simulated trusted TLS headers; it is not public TLS validation.
+- Readiness and /passenger/history, /driver/history, /foundation returned 200 on the isolated frontend server. Both disposable stacks were stopped/removed after checks; main :8080 remains available with its original development data.
+- git diff --check passed. Reviewed intended source/config/docs changes; no tracked real .env or unintended build/temp files, no match for the actual local session secret or scanned credential patterns, and no non-example env file path in Git history. Demo passwords/test-only credentials are intentional public fixtures. This is a targeted release review, not a guarantee from an external secret-auditing service.
+- Unauthenticated GitHub repository API returned 200 and private=false for https://github.com/atikOvi21/dhaka-tesla-pool. Fetch succeeded before integration; remote history must remain a fast-forward on publication.
+
+### Failures, limits and exact remaining actions
+
+No application integration test remains failing. The hosted harness correction above is recorded explicitly. Optional documentation retrieval encountered Neon pages served as HTML/Markdown and a guessed Render schema URL returned 404; provider configuration was reviewed against official documentation, not claimed validated by a provider deployment or schema endpoint. Existing pg8 deprecation warning, coarse ride serialization, process-local auth limits and four previously recorded high tooling advisory entries remain documented. No major dependency upgrade was attempted.
+
+The core MVP release gate passed. The candidate must still create/select Free hosting accounts, enter secrets only in provider settings, deploy the reviewed release branch and pass the real public URL/cookie/persistence checks (or document the actual free-hosting constraint and use Docker). Supply the real video URL, complete the AI-example reasons/specific UI change, and check all evaluator links before personally submitting. See [deployment procedure](deployment.md) and [six-minute outline/checklist](demo-and-submission.md). No additional product work is part of this handoff.
+
+---
+
+
+## Historical checkpoint - shared pooling verified
 
 Verified 24 September 2026. Branch: **feature/tesla-pooling**. The starting ride branch was clean; the committed and verified single-booking checkpoint **458ca30** was fast-forwarded into master with history preserved, then this branch was created. Pooling is not merged into master. No push, deployment, release branch, dependency change, schema migration or development reset.
 

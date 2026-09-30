@@ -46,6 +46,8 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
   const [fields, setFields] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
+  const [canCheckSession, setCanCheckSession] = useState(false);
+  const [failureCode, setFailureCode] = useState("");
   const submitting = useRef(false);
   const form = useRef<HTMLFormElement>(null);
   const registration = mode === "register";
@@ -73,6 +75,8 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
         "Use 12–128 characters. Spaces count and are preserved.";
     setFields(invalid);
     setError("");
+    setCanCheckSession(false);
+    setFailureCode("");
     if (Object.keys(invalid).length) return;
     submitting.current = true;
     setPending(true);
@@ -83,7 +87,24 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
         ...(registration ? { name } : {}),
       });
     } catch (failure) {
-      setError(errorMessage(failure));
+      const code = failure instanceof ApiError ? failure.code : "";
+      const uncertain = failure instanceof ApiError &&
+        (failure.status === 0 || failure.status >= 500) && code !== "AUTH_BUSY";
+      setFailureCode(code);
+      setCanCheckSession(uncertain);
+      setError(
+        uncertain
+          ? registration
+            ? "We couldn't confirm whether your account was created. Check your sign-in status before trying again. If you are still signed out, try signing in with these details."
+            : "We couldn't confirm whether you signed in. Check your connection, then check your sign-in status."
+          : code === "INVALID_CREDENTIALS"
+            ? "Incorrect email or password. Please try again."
+            : code === "EMAIL_UNAVAILABLE"
+              ? "This email already has an account. Try signing in."
+              : code === "RATE_LIMITED"
+                ? "Too many attempts. Please wait before trying again."
+                : errorMessage(failure),
+      );
       if (failure instanceof ApiError && failure.code === "EMAIL_UNAVAILABLE")
         setFields({
           email: "This email already has an account. Try signing in.",
@@ -135,14 +156,18 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
         {error && (
           <div role="alert" className={styles.error}>
             <p>{error}</p>
-            <p>No request has been automatically resubmitted.</p>
-            <button
-              type="button"
-              className={styles.secondary}
-              onClick={() => void auth.restore()}
-            >
-              Check session
-            </button>
+            {canCheckSession && (
+              <button
+                type="button"
+                className={styles.secondary}
+                onClick={() => void auth.restore()}
+              >
+                Check sign-in status
+              </button>
+            )}
+            {registration && failureCode === "EMAIL_UNAVAILABLE" && (
+              <Link to="/login">Sign in to your existing account</Link>
+            )}
           </div>
         )}
         <form ref={form} noValidate onSubmit={submit} aria-busy={pending}>
