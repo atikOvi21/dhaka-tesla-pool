@@ -6,7 +6,7 @@ A small ride-pooling MVP for RoBenDevs’ Software Engineer Internship assessmen
 
 **Status: the MVP is deployed on Render with Neon PostgreSQL.** Authentication, shared rides, fares, cancellation and driver actions are implemented. The video upload and personal AI-example details are still pending.
 
-Extended submission deadline: **30 September 2026, 23:59 Bangladesh time**. Requirements: [supplied PRD](Dhaka_Tesla_Pool_PRD_Internship.pdf).
+Requirements: [supplied PRD](Dhaka_Tesla_Pool_PRD_Internship.pdf).
 
 ## Implemented versus planned
 
@@ -18,17 +18,15 @@ Implemented rides: route and seat selection, fare previews, booking, driver avai
 
 Compatible bookings can share a vehicle. Each booking stays together. A 20% discount applies when at least two separate active bookings remain at arrival. Real PostgreSQL tests cover seat competition and cancellation/arrival races.
 
-Pooling was merged into master. The pre-release and release/v1.0.0 branches were created and pushed. The supplied Render log confirms deployment of commit 2b03c46 on 26 September. The authentication error-message fix was later published in release commit e1437a2; its public redeployment has not been confirmed. [Current evidence and remaining checks](docs/progress.md) distinguish local tests from public checks.
+Pooling was merged into master. The pre-release and release/v1.0.0 branches were created and pushed.
 
 **Live app: [https://dhaka-tesla-pool-hyie.onrender.com](https://dhaka-tesla-pool-hyie.onrender.com)**
 
-Free hosting may take about a minute or longer to wake after inactivity. Please keep the tab open.
+Free hosting may take about a minute or longer to wake up after inactivity. Please keep the tab open.
 
 Use this root URL for the demo. It opens /login when signed out, /passenger for a signed-in passenger, or /driver for a signed-in driver. /foundation is a supporting system-status page, not the main submission page.
 
 Public readiness and page routes were checked. The candidate also reported checking full capacity and cancellation before arrival. Full public security and restart checks are not all recorded yet. [Deployment guide](docs/deployment.md)
-
-**Video Link:** [Open Google Drive folder](https://drive.google.com/drive/folders/1EYClYW4iLF_SQltxZ1SqtcQ9-hLmzDPx?usp=sharing) - Video upload pending. [Timed outline and submission checklist](docs/demo-and-submission.md)
 
 Repository: https://github.com/atikOvi21/dhaka-tesla-pool (public access verified without authentication). Authentication screenshots: [login](docs/images/auth-login-desktop.png), [passenger](docs/images/auth-passenger-desktop.png), [mobile registration](docs/images/auth-register-mobile.png). Foundation screenshots: [desktop](docs/images/foundation-desktop.png) / [mobile](docs/images/foundation-mobile.png).
 
@@ -251,18 +249,6 @@ The authentication error-message fix was merged and pushed to master, pre-releas
 Driver cancellation and reassignment are outside this MVP. Routes use demo zones and distances. There is no GPS, real payment processing, chat, password reset or email verification.
 
 Ride writes run one at a time across the database. Authentication rate limits reset when the API restarts. Free hosting can sleep or hit quotas. Known dependency warnings are listed in [dependency notes](docs/dependencies.md).
-
-## AI Usage
-
-OpenAI Codex helped with design documents, code, tests, debugging and deployment instructions. The candidate supplied the project requirements and reviewed the stack and Git commits.
-
-The candidate reported these choices on 25 September:
-
-- Accepted, reported by the candidate on 25 September: AI assistance for typical request/accept ride implementation. **Candidate reason still needed**; do not infer it from passing tests.
-- Changed/rejected, reported by the candidate: they did not choose all AI-proposed UI designs. **Specific UI example and reason still needed.** The candidate also reports thoroughly reviewing Git commits and stack choices.
-- Observed implementation correction: Prisma validation required composite uniqueness for role-bearing one-to-one relations; Codex added it and reran checks. This is a technical correction, not an invented candidate rejection.
-
-The candidate still needs to provide the personal reasons and a specific changed UI example. These details have not been invented. The [progress record](docs/progress.md) keeps the earlier AI-assisted work and test corrections.
 
 ## Frontend authentication verification
 
